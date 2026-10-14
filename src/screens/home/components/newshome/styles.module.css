@@ -1,18 +1,425 @@
+/* ============================================================
+   NEWS HOME — Jornal impresso (papel + tinta)
+   ============================================================ */
 
 .container {
+  /* Paleta de papel e tinta — local ao componente */
+  --paper:        #f4ecd8;   /* papel jornal envelhecido */
+  --paper-2:      #ebe1c8;   /* papel sombreado */
+  --paper-edge:   #d8ccae;   /* borda do papel */
+  --ink:          #1a1815;   /* tinta preta */
+  --ink-soft:     #3a352c;   /* tinta esmaecida */
+  --ink-faint:    #6b6353;   /* tinta fraca */
+  --rule:         #2a2620;   /* filete preto */
+  --rule-soft:    #a89c7c;   /* filete fino */
+  --stamp:        #8a1c1c;   /* vermelho de manchete/urgente */
+
   display: flex;
   flex-direction: column;
   gap: 20px;
-
-  width: 100%;
-  height: 100%;
-  background-color: var(--bg);
-
+  padding: 28px 26px;
+  background: var(--paper);
+  border: 1px solid var(--paper-edge);
+  border-radius: 4px;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.04) inset,
+    0 10px 28px rgba(2, 6, 15, 0.55);
+  /* leve textura de papel */
+  background-image:
+    radial-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    radial-gradient(rgba(0, 0, 0, 0.015) 1px, transparent 1px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 2px 2px;
+  color: var(--ink);
+  font-family: 'Georgia', 'Times New Roman', 'Iowan Old Style', serif;
+  font-feature-settings: 'kern', 'liga', 'onum';
 }
 
-.contentGrid {
+/* ============================================================
+   CABEÇALHO — cabeça de jornal
+   ============================================================ */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 10px;
+  border-bottom: 3px double var(--rule);
+  position: relative;
+}
+
+/* Fio duplo abaixo do título (assinatura de jornal) */
+.header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  height: 1px;
+  background: var(--rule-soft);
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-family: 'Georgia', serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--stamp);
+}
+
+.header h2 {
+  margin: 0;
+  font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  font-size: 2.1rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.status {
+  font-family: 'Georgia', serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--stamp);
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--stamp);
+  border-radius: 2px;
+}
+
+/* ============================================================
+   ESTADOS
+   ============================================================ */
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--stamp);
+  background: rgba(138, 28, 28, 0.06);
+  border: 1px solid var(--stamp);
+  border-left-width: 4px;
+  border-radius: 2px;
+}
+
+.empty {
+  margin: 0;
+  padding: 28px 12px;
+  text-align: center;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-faint);
+  background: var(--paper-2);
+  border: 1px dashed var(--rule-soft);
+  border-radius: 2px;
+}
+
+/* ============================================================
+   LISTA DE NOTÍCIAS
+   ============================================================ */
+
+.newsList {
+  display: flex;
+  flex-direction: column;
+}
+
+.newsList > .article + .article {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.article {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  padding: 1rem;
+  grid-template-columns: 200px 1fr;
+  gap: 22px;
+  align-items: start;
+}
+
+/* Manchete principal ocupa tudo */
+.article:first-child {
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.article:first-child .image {
+  aspect-ratio: 16 / 9;
+}
+
+.article:first-child h3 {
+  font-size: 2rem;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+/* ============================================================
+   IMAGEM — foto de jornal
+   ============================================================ */
+
+.image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 2px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  /* meio-tom sutil de impressão */
+  filter: grayscale(0.65) contrast(1.08) sepia(0.15);
+}
+
+.article:first-child .image {
+  filter: grayscale(0.7) contrast(1.1) sepia(0.18);
+}
+
+/* ============================================================
+   CORPO DO ARTIGO
+   ============================================================ */
+
+.articleBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* ---------- Meta (veículo + tom) ---------- */
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Georgia', serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.meta > span:first-child {
+  color: var(--ink-soft);
+}
+
+.meta > span:first-child::after {
+  content: '·';
+  margin-left: 10px;
+  color: var(--rule-soft);
+  font-weight: 400;
+}
+
+/* Tom — carimbo de jornal */
+.meta > span[data-tone] {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  letter-spacing: 0.16em;
+}
+
+.meta > span[data-tone='positivo'] { color: #2f6b33; }
+.meta > span[data-tone='neutro']   { color: var(--ink-faint); }
+.meta > span[data-tone='negativo'] { color: var(--stamp); }
+
+/* ---------- Manchete ---------- */
+
+.article h3 {
+  margin: 0;
+  font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+
+/* ---------- Submanchete (linha fina) ---------- */
+
+.subtitle {
+  margin: 0;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 1rem;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+/* ---------- Corpo (duas colunas, com fio) ---------- */
+
+.body {
+  margin: 0;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--ink);
+  text-align: justify;
+  hyphens: auto;
+  column-count: 2;
+  column-gap: 22px;
+  column-rule: 1px solid var(--rule-soft);
+}
+
+.article:first-child .body {
+  column-count: 2;
+}
+
+/* Capitular na manchete principal */
+.article:first-child .body::first-letter {
+  float: left;
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: 3.4rem;
+  line-height: 0.85;
+  font-weight: 900;
+  padding: 6px 8px 0 0;
+  color: var(--stamp);
+}
+
+/* ============================================================
+   REDES SOCIAIS — coluna de "repercussão"
+   ============================================================ */
+
+.social {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 22px;
+  border-top: 3px double var(--rule);
+  position: relative;
+}
+
+.social h3 {
+  margin: 0 0 6px;
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.social h3::after {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 2px;
+  margin-top: 6px;
+  background: var(--stamp);
+}
+
+.post {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--paper-2);
+  border: 1px solid var(--rule-soft);
+  border-left: 3px solid var(--ink);
+  border-radius: 2px;
+  position: relative;
+}
+
+/* Aspas tipográficas no canto — cara de citação de jornal */
+.post::before {
+  content: '\201C';
+  position: absolute;
+  top: 2px;
+  right: 10px;
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--rule-soft);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.post p {
+  margin: 0;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 0.9rem;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.post span {
+  font-family: 'Georgia', serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* ============================================================
+   RESPONSIVO
+   ============================================================ */
+
+@media (max-width: 720px) {
+  .container {
+    padding: 22px 20px;
+  }
+
+  .article,
+  .article:first-child {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .body,
+  .article:first-child .body {
+    column-count: 1;
+  }
+
+  .header h2 {
+    font-size: 1.6rem;
+  }
+
+  .article:first-child h3 {
+    font-size: 1.5rem;
+  }
+
+  .article:first-child .body::first-letter {
+    font-size: 2.6rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .container {
+    padding: 18px 16px;
+    border-radius: 2px;
+  }
+
+  .header h2 {
+    font-size: 1.35rem;
+  }
+
+  .article h3 {
+    font-size: 1.15rem;
+  }
+
+  .body {
+    font-size: 0.88rem;
+  }
+}
+
+/* ============================================================
+   ACESSIBILIDADE
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .image {
+    filter: none;
+  }
 }

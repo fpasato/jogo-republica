@@ -28,6 +28,7 @@ const RETRY_TEMPERATURES = [0.2] as const;
 
 /** Máximo de rodadas de consulta antes de forçar análise. */
 const DEFAULT_MAX_QUERY_ROUNDS = 0;
+const POLICY_TIMEOUT_MS = 180_000;
 
 // ============================================================
 // TIPOS
@@ -43,6 +44,8 @@ export interface PolicyAIOptions {
   maxQueryRounds?: number;
   /** Timeout por chamada ao Ollama (ms). */
   timeoutMs?: number;
+  /** Limite de tokens gerados na análise. */
+  numPredict?: number;
   /** Aborta tudo (ex.: usuário cancelou). */
   signal?: AbortSignal;
 }
@@ -142,7 +145,9 @@ export async function analyzePolicy(
         model,
         temperature,
         maxQueryRounds,
-        timeoutMs: options.timeoutMs,
+        timeoutMs: options.timeoutMs ?? POLICY_TIMEOUT_MS,
+        numPredict: options.numPredict ?? 2000,
+        numCtx: 8192,
         signal: options.signal,
       });
 
@@ -240,6 +245,8 @@ interface AttemptInput {
   temperature: number;
   maxQueryRounds: number;
   timeoutMs?: number;
+  numPredict?: number;
+  numCtx?: number;
   signal?: AbortSignal;
 }
 
@@ -265,6 +272,8 @@ async function runOneAttempt(input: AttemptInput): Promise<AttemptOutcome> {
     temperature,
     maxQueryRounds,
     timeoutMs,
+    numPredict,
+    numCtx,
     signal,
   } = input;
 
@@ -273,10 +282,18 @@ async function runOneAttempt(input: AttemptInput): Promise<AttemptOutcome> {
 
   // ---------- Chamada 1: payload inicial ----------
   const initialPayload = buildInitialPayload(context);
+  const promptChars = initialPayload.system.length + initialPayload.user.length;
+  console.info('[policyAI] Tamanho do prompt', {
+    systemChars: initialPayload.system.length,
+    userChars: initialPayload.user.length,
+    estimatedTokens: Math.round(promptChars / 4),
+  });
   const first = await callOllama(initialPayload, {
     model,
     temperature,
     timeoutMs,
+    numPredict,
+    numCtx,
     signal,
   });
   promptTokens += first.promptTokens ?? 0;
@@ -337,6 +354,8 @@ async function runOneAttempt(input: AttemptInput): Promise<AttemptOutcome> {
       model,
       temperature,
       timeoutMs,
+      numPredict,
+      numCtx,
       signal,
     });
     promptTokens += next.promptTokens ?? 0;
@@ -393,6 +412,8 @@ interface CallOpts {
   model: string;
   temperature: number;
   timeoutMs?: number;
+  numPredict?: number;
+  numCtx?: number;
   signal?: AbortSignal;
 }
 
@@ -405,6 +426,8 @@ async function callOllama(payload: PromptPayload, opts: CallOpts) {
     model: opts.model,
     temperature: opts.temperature,
     timeoutMs: opts.timeoutMs,
+    numPredict: opts.numPredict,
+    numCtx: opts.numCtx,
     signal: opts.signal,
   });
 }

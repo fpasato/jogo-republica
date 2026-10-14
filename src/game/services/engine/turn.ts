@@ -1,4 +1,4 @@
-import { STATE_IDS, type StateId } from '../../data/states';
+import { STATE_IDS, STATES, totalPopulation, type StateId } from '../../data/states';
 import { getIndicator, INDICATORS } from '../../data/indicators';
 import type { ActivePolicy } from '../../types/policy';
 import {
@@ -20,6 +20,10 @@ import {
   type IndicatorDeltas,
 } from './approval';
 import type { GameState } from './initialState';
+import { propagateChains, applyCascadeDeltas } from './propagation';
+import { deriveStateIdh } from './deriveStateIdh';
+import { INDICATOR_CHAINS } from '../../data/indicatorChains';
+
 // ============================================================
 // TIPOS
 // ============================================================
@@ -65,6 +69,33 @@ export interface TurnOutput extends GameState {
 // ============================================================
 
 const SPECIAL_EFFECT_KEYS = new Set(['budget', 'expenses', 'approval']);
+const POLICY_DIAGNOSTIC_INDICATORS = new Set([
+  'salario_minimo',
+  'receitas_publicas',
+  'gastos_publicos',
+]);
+const BRAZIL_POPULATION = totalPopulation();
+
+/** Distribui medidas nacionais de contagem conforme a população estadual.
+ * Indicadores em taxa/média recebem o mesmo delta em cada estado; assim,
+ * o agregado ponderado muda pelo delta original e os eventos absolutos
+ * correspondentes crescem proporcionalmente à população.
+ */
+function statePolicyDelta(
+  indicator: ReturnType<typeof getIndicator>,
+  amount: number,
+  stateId: StateId,
+  isRegionalPolicy: boolean,
+): number {
+  if (
+    !isRegionalPolicy &&
+    indicator.scope === 'state_aggregated' &&
+    indicator.aggregation?.kind === 'sum'
+  ) {
+    return amount * (STATES[stateId].population / BRAZIL_POPULATION);
+  }
+  return amount;
+}
 
 interface PolicyDeltas {
   states: Record<StateId, Record<string, number>>;
@@ -84,16 +115,24 @@ interface PolicyDeltas {
  *
  * Se `implementationMonths > 0`, nada é aplicado até o fim da carência.
  */
-function policyMonthlyDelta(policy: ActivePolicy, target: number): number {
+function policyEffectStep(policy: ActivePolicy, includeCurrentTurn: boolean): number {
   const impl = policy.implementationMonths ?? 0;
   const active = policy.activeMonths ?? 0;
-  if (active < impl) return 0;
+  const elapsed = active + (includeCurrentTurn ? 1 : 0);
+  if (elapsed < impl) return -1;
+  // impl=0 começa no primeiro turno; impl>0 começa no primeiro turno
+  // que cumpre o prazo de implementação.
+  return Math.max(0, elapsed - impl - (impl === 0 ? 1 : 0));
+}
 
-  const effective = active - impl;
+function policyMonthlyDelta(policy: ActivePolicy, indicatorId: string, target: number): number {
+  const step = policyEffectStep(policy, true);
+  if (step < 0) return 0;
+  if (indicatorId === 'salario_minimo') return step === 0 ? target : 0;
+
   const ramp = policy.effectRampUpMonths ?? 1;
-
-  if (ramp <= 1) return effective === 0 ? target : 0;
-  if (effective >= ramp) return 0;
+  if (ramp <= 1) return step === 0 ? target : 0;
+  if (step >= ramp) return 0;
   return target / ramp;
 }
 
@@ -101,13 +140,32 @@ function policyMonthlyDelta(policy: ActivePolicy, target: number): number {
  * Efeito acumulado total que a política já aplicou até agora.
  * Usado pra reverter quando uma política temporária expira.
  */
-function policyAccumulated(policy: ActivePolicy, target: number): number {
-  const impl = policy.implementationMonths ?? 0;
-  const active = policy.activeMonths ?? 0;
-  const effective = Math.max(0, active - impl);
+function policyAccumulated(policy: ActivePolicy, indicatorId: string, target: number): number {
+  const step = policyEffectStep(policy, false);
+  const completedSteps = step < 0 ? 0 : step + 1;
+  if (indicatorId === 'salario_minimo') return completedSteps > 0 ? target : 0;
   const ramp = policy.effectRampUpMonths ?? 1;
-  if (ramp <= 1) return effective > 0 ? target : 0;
-  return target * Math.min(1, effective / ramp);
+  if (ramp <= 1) return completedSteps > 0 ? target : 0;
+  return target * Math.min(1, completedSteps / ramp);
+}
+
+/** Delta fiscal na taxa anualizada, em R$ bilhões por turno. */
+function policyMonthlyFiscal(policy: ActivePolicy): number {
+  if (!policy.fiscalAnnual) return 0;
+  const step = policyEffectStep(policy, true);
+  if (step < 0) return 0;
+  const ramp = Math.max(1, policy.effectRampUpMonths ?? 1);
+  if (step >= ramp) return 0;
+  return (policy.fiscalAnnual / 1e9) / ramp;
+}
+
+/** Impacto fiscal anualizado já incorporado, para reverter medidas temporárias. */
+function policyAccumulatedFiscal(policy: ActivePolicy): number {
+  if (!policy.fiscalAnnual) return 0;
+  const step = policyEffectStep(policy, false);
+  const completedSteps = step < 0 ? 0 : step + 1;
+  const ramp = Math.max(1, policy.effectRampUpMonths ?? 1);
+  return (policy.fiscalAnnual / 1e9) * Math.min(1, completedSteps / ramp);
 }
 
 function computePolicyDeltas(policies: ActivePolicy[]): PolicyDeltas {
@@ -119,7 +177,28 @@ function computePolicyDeltas(policies: ActivePolicy[]): PolicyDeltas {
   const expired: string[] = [];
 
   for (const p of policies) {
+    const targetStates = p.targetStates?.length
+      ? STATE_IDS.filter((sid) => p.targetStates?.includes(sid))
+      : STATE_IDS;
+    const isRegionalPolicy = p.targetStates !== undefined && p.targetStates.length > 0;
     const active = p.activeMonths ?? 0;
+    const diagnosticEffects = Object.fromEntries(
+      Object.entries(p.effects).filter(([id]) => POLICY_DIAGNOSTIC_INDICATORS.has(id)),
+    );
+    if (active === 0 || Object.keys(diagnosticEffects).length > 0) {
+      console.info('[runGameTurn] Efeitos de salário/orçamento na política', {
+        policyId: p.id,
+        name: p.name,
+        activeMonths: active,
+        implementationMonths: p.implementationMonths ?? 0,
+        effectRampUpMonths: p.effectRampUpMonths ?? 0,
+        fiscalAnnual: p.fiscalAnnual,
+        effects: diagnosticEffects,
+      });
+    }
+    if (active === 0 && Object.keys(diagnosticEffects).length === 0) {
+      console.warn(`[runGameTurn] A política "${p.name}" não contém salário mínimo, receitas ou gastos nos efeitos.`);
+    }
 
     // Expiração: reverte o acumulado antes de sair
     if (
@@ -127,23 +206,32 @@ function computePolicyDeltas(policies: ActivePolicy[]): PolicyDeltas {
       p.durationMonths > 0 &&
       active >= p.durationMonths
     ) {
+      const fiscalAccumulated = policyAccumulatedFiscal(p);
+      if (fiscalAccumulated > 0) {
+        national.receitas_publicas = (national.receitas_publicas ?? 0) - fiscalAccumulated;
+      } else if (fiscalAccumulated < 0) {
+        national.gastos_publicos = (national.gastos_publicos ?? 0) + Math.abs(fiscalAccumulated);
+      }
+
       for (const [rawId, rawTarget] of Object.entries(p.effects)) {
         if (SPECIAL_EFFECT_KEYS.has(rawId)) continue;
         const target = rawTarget as number;
         if (target === 0) continue;
-        const accumulated = policyAccumulated(p, target);
+        const accumulated = policyAccumulated(p, rawId, target);
         const reverse = -accumulated;
         const ind = getIndicator(rawId);
         if (ind.scope === 'national') {
           national[rawId] = (national[rawId] ?? 0) + reverse;
         } else if (ind.scope === 'national_and_state') {
-          national[rawId] = (national[rawId] ?? 0) + reverse;
-          for (const sid of STATE_IDS) {
-            states[sid][rawId] = (states[sid][rawId] ?? 0) + reverse;
+          if (!isRegionalPolicy) {
+            national[rawId] = (national[rawId] ?? 0) + reverse;
+          }
+          for (const sid of targetStates) {
+            states[sid][rawId] = (states[sid][rawId] ?? 0) + statePolicyDelta(ind, reverse, sid, isRegionalPolicy);
           }
         } else {
-          for (const sid of STATE_IDS) {
-            states[sid][rawId] = (states[sid][rawId] ?? 0) + reverse;
+          for (const sid of targetStates) {
+            states[sid][rawId] = (states[sid][rawId] ?? 0) + statePolicyDelta(ind, reverse, sid, isRegionalPolicy);
           }
         }
       }
@@ -153,23 +241,56 @@ function computePolicyDeltas(policies: ActivePolicy[]): PolicyDeltas {
     }
 
     let applied = 0;
+    const fiscalDelta = policyMonthlyFiscal(p);
+    if (fiscalDelta !== 0) {
+      console.info('[runGameTurn] Parcela fiscal aplicada', {
+        policyId: p.id,
+        fiscalAnnual: p.fiscalAnnual,
+        fiscalDeltaBi: fiscalDelta,
+        destination: fiscalDelta > 0 ? 'receitas_publicas' : 'gastos_publicos',
+        activeMonths: active,
+        implementationMonths: p.implementationMonths,
+        effectRampUpMonths: p.effectRampUpMonths,
+      });
+    }
+    if (fiscalDelta > 0) {
+      national.receitas_publicas = (national.receitas_publicas ?? 0) + fiscalDelta;
+      applied++;
+    } else if (fiscalDelta < 0) {
+      national.gastos_publicos = (national.gastos_publicos ?? 0) + Math.abs(fiscalDelta);
+      applied++;
+    }
     for (const [rawId, rawTarget] of Object.entries(p.effects)) {
       if (SPECIAL_EFFECT_KEYS.has(rawId)) continue;
       const target = rawTarget as number;
-      const amount = policyMonthlyDelta(p, target);
+      const amount = policyMonthlyDelta(p, rawId, target);
+      if (POLICY_DIAGNOSTIC_INDICATORS.has(rawId)) {
+        console.info('[runGameTurn] Parcela calculada para indicador nacional', {
+          policyId: p.id,
+          name: p.name,
+          indicatorId: rawId,
+          targetDelta: target,
+          monthlyDelta: amount,
+          activeMonths: active,
+          implementationMonths: p.implementationMonths ?? 0,
+          effectRampUpMonths: p.effectRampUpMonths ?? 0,
+        });
+      }
       if (amount === 0) continue;
 
       const ind = getIndicator(rawId);
       if (ind.scope === 'national') {
         national[rawId] = (national[rawId] ?? 0) + amount;
       } else if (ind.scope === 'national_and_state') {
-        national[rawId] = (national[rawId] ?? 0) + amount;
-        for (const sid of STATE_IDS) {
-          states[sid][rawId] = (states[sid][rawId] ?? 0) + amount;
+        if (!isRegionalPolicy) {
+          national[rawId] = (national[rawId] ?? 0) + amount;
+        }
+        for (const sid of targetStates) {
+          states[sid][rawId] = (states[sid][rawId] ?? 0) + statePolicyDelta(ind, amount, sid, isRegionalPolicy);
         }
       } else {
-        for (const sid of STATE_IDS) {
-          states[sid][rawId] = (states[sid][rawId] ?? 0) + amount;
+        for (const sid of targetStates) {
+          states[sid][rawId] = (states[sid][rawId] ?? 0) + statePolicyDelta(ind, amount, sid, isRegionalPolicy);
         }
       }
       applied++;
@@ -278,6 +399,8 @@ function ageAndExpirePolicies(
     .filter((p) => !expiredIds.has(p.id))
     .map((p) => ({ ...p, activeMonths: (p.activeMonths ?? 0) + 1 }));
 }
+
+
 
 // ============================================================
 // 5. RESUMO NARRATIVO
@@ -396,12 +519,50 @@ export function runGameTurn(input: TurnInput): TurnOutput {
     reactionsResult,
   );
 
-  // Re-agregação: as reações podem ter mexido em indicadores estaduais,
-  // e os derivados nacionais precisam refletir isso.
+  // ---------- 4a. Cadeias de propagação ----------
+  const directDeltas = computeIndicatorDeltas(
+    input,
+    afterReactions.stateIndicators,
+    afterReactions.nationalIndicators,
+  ).national;
+
+  const cascadeDeltas = propagateChains(directDeltas, INDICATOR_CHAINS);
+
+  applyCascadeDeltas(
+    afterReactions.nationalIndicators,
+    afterReactions.stateIndicators,
+    cascadeDeltas,
+  );
+
+  // ---------- 4b. Deriva IDH estadual a partir de saúde/educação/renda ----------
+  deriveStateIdh(afterReactions.stateIndicators);
+
+  // ---------- 4c. Re-agregação nacional ----------
   const reAggregated = aggregateAll(afterReactions.stateIndicators);
   for (const [id, value] of Object.entries(reAggregated)) {
     afterReactions.nationalIndicators[id] = value;
   }
+
+  for (const [id, d] of Object.entries(cascadeDeltas)) {
+    const ind = INDICATORS[id];
+    if (!ind) continue;                 // segurança: ignora ids desconhecidos
+    const current = afterReactions.nationalIndicators[id] ?? 0;
+    afterReactions.nationalIndicators[id] = Math.max(
+      ind.min,
+      Math.min(ind.max, current + d),
+    );
+  }
+
+  // Saldo nacional é derivado dos fluxos federais depois das políticas,
+  // regras, reações e cascatas deste turno.
+  const receipts = afterReactions.nationalIndicators.receitas_publicas ?? 0;
+  const expenses = afterReactions.nationalIndicators.gastos_publicos ?? 0;
+  const balanceDef = INDICATORS.saldo_orcamentario;
+  afterReactions.nationalIndicators.saldo_orcamentario = Math.max(
+    balanceDef.min,
+    Math.min(balanceDef.max, receipts - expenses),
+  );
+
 
   // ---------- 5. macroSync ----------
   const macroSyncResult = syncMacroIndicators(input.macros, {
@@ -416,6 +577,7 @@ export function runGameTurn(input: TurnInput): TurnOutput {
   );
   const approvalResult = runApprovalTurn({
     groupApprovals: input.groupApprovals,
+    previousNationalApproval: input.nationalApproval,
     govIdeology: input.profile.govIdeology,
     activePolicies: input.activePolicies,
     indicatorDeltas: computeIndicatorDeltas(
@@ -431,6 +593,10 @@ export function runGameTurn(input: TurnInput): TurnOutput {
   const stateApprovals = computeStateApprovals(
     approvalResult.nationalApproval,
     input.profile.govIdeology,
+    afterReactions.stateIndicators,
+    input.history,
+    input.stateApprovals,
+    input.stateIndicators,
   );
 
   // ---------- 8. Idade das políticas ----------
@@ -462,6 +628,16 @@ export function runGameTurn(input: TurnInput): TurnOutput {
     },
     policyDeltas.perPolicy,
   );
+
+  console.info('[runGameTurn] Resultado nacional de salário e orçamento', {
+    before: Object.fromEntries(
+      [...POLICY_DIAGNOSTIC_INDICATORS].map((id) => [id, input.nationalIndicators[id]]),
+    ),
+    after: Object.fromEntries(
+      [...POLICY_DIAGNOSTIC_INDICATORS].map((id) => [id, afterReactions.nationalIndicators[id]]),
+    ),
+    policyLog,
+  });
 
   return {
     ...input,

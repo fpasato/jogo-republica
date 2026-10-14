@@ -15,4 +15,51 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
   padding: 1rem;
+  align-items: start;
+}
+
+.loadingOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--bg, #080d14) 84%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.loadingCard {
+  width: min(100%, 420px);
+  padding: 2rem;
+  border: 1px solid var(--border, #293444);
+  border-radius: 18px;
+  background: var(--surface, #111923);
+  color: var(--text, #edf2f7);
+  text-align: center;
+  box-shadow: 0 24px 80px #0008;
+}
+
+.loadingCard h2 { margin: 1rem 0 .5rem; }
+.loadingCard p { margin: 0 0 .75rem; color: var(--text-muted, #a6b1bf); }
+.loadingCard small { color: var(--text-muted, #8593a4); }
+
+.spinner {
+  display: inline-block;
+  width: 42px;
+  height: 42px;
+  border: 3px solid color-mix(in srgb, var(--accent, #8dc7ff) 25%, transparent);
+  border-top-color: var(--accent, #8dc7ff);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 1100px) {
+  .contentGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .contentGrid { grid-template-columns: minmax(0, 1fr); }
 }

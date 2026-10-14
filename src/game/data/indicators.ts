@@ -240,6 +240,9 @@ const INFRAESTRUTURA: IndicatorDef[] = [
 // ============================================================
 
 const SOCIAL: IndicatorDef[] = [
+  SA('idh', 'IDH (simulado)', '0–1', 0, 1, 'higher_is_better', AGG_POP, 'social', {
+    description: 'Índice de desenvolvimento humano do jogo, estimado por saúde, educação e renda; não é o cálculo oficial do IDH.',
+  }),
   SA('pobreza', 'Taxa de pobreza', '%', 0, 100, 'lower_is_better', AGG_POP, 'social'),
   SA('pobreza_extrema', 'Pobreza extrema', '%', 0, 100, 'lower_is_better', AGG_POP, 'social'),
   SA('gini', 'Desigualdade (Gini)', '0–1', 0, 1, 'lower_is_better', AGG_POP, 'social'),

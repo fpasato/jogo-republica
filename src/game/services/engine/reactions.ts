@@ -56,6 +56,17 @@ const KEY_TRANSLATION: Record<string, string> = {
 
 /** Margem de histerese pra encerrar reação (aprovação precisa subir acima disso). */
 const END_MARGIN = 8;
+const MIN_REACTION_MONTHS = 4;
+const REACTION_BUILDUP_MONTHS = 5;
+const REACTION_CHAINS: Record<string, Record<string, number>> = {
+  empresarios: { mercado_financeiro: -0.45 },
+  mercado_financeiro: { empresarios: -0.35 },
+  trabalhadores: { aposentados: -0.35, jovens: -0.25 },
+  universitarios: { ciencia: -0.35 },
+  ciencia: { universitarios: -0.3 },
+  conservadores: { religiosos: -0.3 },
+  religiosos: { conservadores: -0.3 },
+};
 
 // ============================================================
 // CÁLCULO
@@ -78,7 +89,7 @@ export function computeReactions(input: ReactionsInput): ReactionsOutput {
   for (const r of input.active) {
     const g = getGroup(r.groupId);
     const approval = input.groupApprovals[r.groupId] ?? 50;
-    if (approval > g.limiarReacao + END_MARGIN) {
+    if (r.monthsActive >= MIN_REACTION_MONTHS && approval > g.limiarReacao + END_MARGIN) {
       ended.push(r);
       activeMap.delete(r.groupId);
       log.push({ groupId: r.groupId, kind: 'end', detail: 'aprovação recuperada' });
@@ -106,6 +117,9 @@ export function computeReactions(input: ReactionsInput): ReactionsOutput {
     if (!g.reacao) continue;
 
     const combat = g.combatividade ?? 1;
+    // Uma reação persistente ganha força nos primeiros meses.
+    const buildup = 1 + Math.min(0.5, r.monthsActive / REACTION_BUILDUP_MONTHS * 0.5);
+    const intensity = combat * buildup;
 
     // 3a. Efeitos nos indicadores
     for (const [rawKey, amount] of Object.entries(g.reacao.mensal.indicadores ?? {})) {
@@ -113,13 +127,13 @@ export function computeReactions(input: ReactionsInput): ReactionsOutput {
       if (rawKey === 'dollar') {
         const current = input.nationalIndicators.cotacao_dolar ?? 5;
         const delta = (amount / 100) * current;
-        nationalDeltas.cotacao_dolar = (nationalDeltas.cotacao_dolar ?? 0) + delta;
+        nationalDeltas.cotacao_dolar = (nationalDeltas.cotacao_dolar ?? 0) + delta * buildup;
         continue;
       }
 
       // Macros standalone: escreve direto no nacional
       if (STANDALONE_MACROS.has(rawKey)) {
-        nationalDeltas[rawKey] = (nationalDeltas[rawKey] ?? 0) + amount * combat;
+        nationalDeltas[rawKey] = (nationalDeltas[rawKey] ?? 0) + amount * intensity;
         continue;
       }
 
@@ -129,7 +143,7 @@ export function computeReactions(input: ReactionsInput): ReactionsOutput {
 
       // Aplica onde o indicador vive
       if (ind.scope === 'national') {
-        nationalDeltas[detailedId] = (nationalDeltas[detailedId] ?? 0) + amount * combat;
+        nationalDeltas[detailedId] = (nationalDeltas[detailedId] ?? 0) + amount * intensity;
       } else if (
         ind.scope === 'state_aggregated' ||
         ind.scope === 'state' ||
@@ -138,11 +152,11 @@ export function computeReactions(input: ReactionsInput): ReactionsOutput {
         // Aplica em todos os estados (reação nacional)
         for (const sid of STATE_IDS) {
           stateDeltas[sid][detailedId] =
-            (stateDeltas[sid][detailedId] ?? 0) + amount * combat;
+            (stateDeltas[sid][detailedId] ?? 0) + amount * intensity;
         }
         // Se também é nacional_and_state, aplica no lado federal também
         if (ind.scope === 'national_and_state') {
-          nationalDeltas[detailedId] = (nationalDeltas[detailedId] ?? 0) + amount * combat;
+          nationalDeltas[detailedId] = (nationalDeltas[detailedId] ?? 0) + amount * intensity;
         }
       }
     }
@@ -150,7 +164,12 @@ export function computeReactions(input: ReactionsInput): ReactionsOutput {
     // 3b. Efeitos na aprovação de outros grupos
     for (const [otherId, amount] of Object.entries(g.reacao.mensal.grupos ?? {})) {
       groupApprovalDeltas[otherId] =
-        (groupApprovalDeltas[otherId] ?? 0) + amount * combat;
+        (groupApprovalDeltas[otherId] ?? 0) + amount * intensity;
+    }
+
+    // Grupos aliados acompanham a reação que já está mobilizada.
+    for (const [allyId, amount] of Object.entries(REACTION_CHAINS[r.groupId] ?? {})) {
+      groupApprovalDeltas[allyId] = (groupApprovalDeltas[allyId] ?? 0) + amount * buildup;
     }
 
     // 3c. Mantém ativa e incrementa contador

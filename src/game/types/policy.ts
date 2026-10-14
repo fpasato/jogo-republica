@@ -38,6 +38,9 @@ export interface ActivePolicy {
   name: string;
   type: PolicyType;
 
+  /** Estados afetados; ausente ou vazio significa todos os estados. */
+  targetStates?: string[];
+
   /** Efeitos sobre indicadores (aplicados por fração mensal). */
   effects: PolicyEffects;
 

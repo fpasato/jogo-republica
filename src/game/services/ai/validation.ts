@@ -1,4 +1,4 @@
-import { INSTRUMENTS, type InstrumentId } from '../../data/catalog';
+import { FISCAL_MAGNITUDE_REAIS, INSTRUMENTS, type InstrumentId } from '../../data/catalog';
 import { INDICATORS } from '../../data/indicators';
 import { GROUP_BY_ID } from '../../data/groups';
 import { STATE_IDS, type StateId } from '../../data/states';
@@ -10,10 +10,6 @@ import type {
   FiscalMagnitude,
 } from '../../types/ai';
 
-// ============================================================
-// CONSTANTES
-// ============================================================
-
 const VALID_INSTRUMENTS = new Set<string>(INSTRUMENTS.map((i) => i.id));
 
 const VALID_LEGAL_RISK = new Set(['baixo', 'medio', 'alto']);
@@ -24,10 +20,6 @@ const VALID_AREAS = new Set([
   'infraestrutura', 'social', 'ambiente', 'gestao', 'politica',
 ]);
 
-/**
- * Indicadores que o motor controla sozinho via `impacto_fiscal`.
- * A IA não deve tentar mexer neles diretamente.
- */
 const FISCAL_CONTROLLED = new Set([
   'receitas_publicas',
   'gastos_publicos',
@@ -40,13 +32,14 @@ const FISCAL_CONTROLLED = new Set([
   'investimento_infraestrutura',
 ]);
 
-/** Limites de delta por indicador (por segurança). */
 const GROUP_DELTA_CLAMP = 15;
-const INDICATOR_DELTA_PCT_CLAMP = 0.40; // nunca mais que 40% do valor atual
+const INDICATOR_DELTA_PCT_CLAMP = 0.40;
 
-// ============================================================
-// TIPOS DE SAÍDA
-// ============================================================
+const INDICATOR_DELTA_MIN: Record<string, number> = {
+  salario_minimo: 20,
+  receitas_publicas: 5,
+  gastos_publicos: 5,
+};
 
 export type ParseResult =
   | { kind: 'query'; data: AIQueryRequest }
@@ -54,9 +47,7 @@ export type ParseResult =
   | { kind: 'error'; error: string; raw: string };
 
 export interface ValidationOptions {
-  /** Texto original do jogador — usado pra correções contextuais. */
   proposalText?: string;
-  /** Valor atual do indicador, usado pra clampar deltas. */
   currentValues?: Record<string, number>;
 }
 
@@ -66,42 +57,25 @@ export interface ValidationResult {
   rejected: string[];
 }
 
-// ============================================================
-// 1. PARSE — extrai JSON da resposta crua
-// ============================================================
-
-/**
- * Extrai o primeiro objeto JSON válido da resposta.
- * Lida com:
- *   - ```json ... ```  (bloco markdown)
- *   - ``` ... ```       (sem linguagem)
- *   - texto antes/depois do JSON
- *   - JSON puro
- *   - <json>...</json>  (algumas variantes)
- */
 export function extractJson(raw: string): unknown | null {
   if (!raw || typeof raw !== 'string') return null;
   const text = raw.trim();
 
-  // Tentativa 1: direto
   const direct = tryJson(text);
   if (direct !== null) return direct;
 
-  // Tentativa 2: bloco markdown ```json ... ```
   const mdMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (mdMatch) {
     const inner = tryJson(mdMatch[1].trim());
     if (inner !== null) return inner;
   }
 
-  // Tentativa 3: <json>...</json>
   const tagMatch = text.match(/<json>\s*([\s\S]*?)<\/json>/i);
   if (tagMatch) {
     const inner = tryJson(tagMatch[1].trim());
     if (inner !== null) return inner;
   }
 
-  // Tentativa 4: primeiro { até último }
   const firstBrace = text.indexOf('{');
   const lastBrace = text.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace > firstBrace) {
@@ -110,8 +84,6 @@ export function extractJson(raw: string): unknown | null {
     if (inner !== null) return inner;
   }
 
-  // Respostas limitadas por num_predict podem terminar no meio do último campo.
-  // Recupera propriedades completas e fecha os objetos, deixando defaults para o restante.
   const repaired = repairTruncatedJson(text);
   if (repaired !== null) return repaired;
 
@@ -123,9 +95,10 @@ function repairTruncatedJson(text: string): unknown | null {
   if (start < 0) return null;
 
   const stack: string[] = [];
-  const commas: Array<{ index: number; depth: number }> = [];
   let inString = false;
   let escaped = false;
+  let lastCommaIndex = -1;
+  let lastCommaDepth = -1;
 
   for (let i = start; i < text.length; i++) {
     const char = text[i];
@@ -140,17 +113,21 @@ function repairTruncatedJson(text: string): unknown | null {
     else if (char === '[') stack.push(']');
     else if (char === '}' || char === ']') {
       if (stack.pop() !== char) return null;
-      if (stack.length === 0) return null; // An object closed cleanly; this is not a truncation.
     } else if (char === ',') {
-      commas.push({ index: i, depth: stack.length });
+      lastCommaIndex = i;
+      lastCommaDepth = stack.length;
     }
   }
 
-  for (let i = commas.length - 1; i >= 0; i--) {
-    const comma = commas[i];
-    const closers = stack.slice(0, comma.depth).reverse().join('');
-    const candidate = `${text.slice(start, comma.index)}${closers}`;
-    const parsed = tryJson(candidate);
+  let base = text.slice(start).trimEnd();
+  if (inString) base += '"';
+  const repaired = tryJson(`${base}${[...stack].reverse().join('')}`);
+  if (repaired !== null) return repaired;
+
+  if (lastCommaIndex > start) {
+    const fallback = text.slice(start, lastCommaIndex).trimEnd();
+    const closers = stack.slice(0, lastCommaDepth).reverse().join('');
+    const parsed = tryJson(`${fallback}${closers}`);
     if (parsed !== null) return parsed;
   }
   return null;
@@ -167,10 +144,6 @@ function tryJson(s: string): unknown | null {
     }
   }
 }
-
-// ============================================================
-// 2. PARSE PRINCIPAL
-// ============================================================
 
 export function parseResponse(raw: string): ParseResult {
   const parsed = extractJson(raw);
@@ -189,17 +162,26 @@ export function parseResponse(raw: string): ParseResult {
   const obj = parsed as Record<string, unknown>;
   const phase = obj.phase;
 
-  // Aceita formato sem "phase" (compatibilidade): se tem "analysis", trata como analysis
   if (phase === 'query') {
     return parseQueryObject(obj, raw);
   }
   if (phase === 'analysis') {
-    return parseAnalysisObject(obj, raw);
+    return isRecord(obj.analysis)
+      ? parseAnalysisObject(obj, raw)
+      : hasAnalysisFields(obj)
+        ? parseAnalysisObject({ phase: 'analysis', analysis: obj }, raw)
+        : parseAnalysisObject(obj, raw);
   }
 
-  // Sem phase explícito
-  if ('analysis' in obj) {
-    return parseAnalysisObject({ phase: 'analysis', ...obj }, raw);
+  if (isRecord(obj.analysis)) {
+    return parseAnalysisObject({ ...obj, phase: 'analysis' }, raw);
+  }
+
+  // Alguns modelos seguem o schema interno, mas omitem o envelope
+  // { phase: "analysis", analysis: {...} }. Aceita o objeto direto
+  // somente quando ele contém campos característicos da análise.
+  if (hasAnalysisFields(obj)) {
+    return parseAnalysisObject({ phase: 'analysis', analysis: obj }, raw);
   }
   if ('queries' in obj) {
     return parseQueryObject({ phase: 'query', ...obj }, raw);
@@ -245,15 +227,29 @@ function parseAnalysisObject(
   raw: string,
 ): ParseResult {
   const analysis = obj.analysis;
-  if (!analysis || typeof analysis !== 'object') {
-    return { kind: 'error', error: 'Campo "analysis" ausente ou inválido.', raw };
+  if (!isRecord(analysis)) {
+    const keys = Object.keys(obj).filter((key) => key !== 'phase').slice(0, 12);
+    const detail = keys.length ? ` Campos recebidos: ${keys.join(', ')}.` : '';
+    const preview = raw.replace(/\s+/g, ' ').trim().slice(0, 240);
+    return { kind: 'error', error: `Campo "analysis" ausente ou inválido.${detail} Resposta: ${preview}`, raw };
   }
-  return { kind: 'analysis', data: analysis as AIInterpretation };
+  return { kind: 'analysis', data: analysis as unknown as AIInterpretation };
 }
 
-// ============================================================
-// 3. VALIDAÇÃO DA ANÁLISE
-// ============================================================
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasAnalysisFields(obj: Record<string, unknown>): boolean {
+  return [
+    'interpretacao',
+    'instrumento',
+    'impacto_fiscal',
+    'indicadores',
+    'grupos',
+    'risco_juridico',
+  ].some((key) => key in obj);
+}
 
 export function validateAnalysis(
   raw: AIInterpretation,
@@ -262,29 +258,29 @@ export function validateAnalysis(
   const warnings: string[] = [];
   const rejected: string[] = [];
 
-  // Cópia rasa pra não mutar o original
   const out: AIInterpretation = { ...raw };
 
-  // ---------- Campos obrigatórios de texto ----------
   out.interpretacao = cleanText(raw.interpretacao) || 'Medida sem descrição.';
   out.motivo_instrumento = cleanText(raw.motivo_instrumento) || '';
 
-  // ---------- Instrumento ----------
   if (!raw.instrumento || !VALID_INSTRUMENTS.has(raw.instrumento)) {
     warnings.push(`Instrumento "${raw.instrumento}" inválido; usando "projeto_lei".`);
     out.instrumento = 'projeto_lei' as InstrumentId;
   }
 
-  // ---------- Impacto fiscal ----------
+  const fiscalMagnitude = clampMagnitude(raw.impacto_fiscal?.magnitude);
+  const annualFiscal = Number(raw.impacto_fiscal?.valor_anual_bi);
   out.impacto_fiscal = {
     tipo: VALID_FISCAL_TYPE.has(raw.impacto_fiscal?.tipo)
       ? raw.impacto_fiscal.tipo
       : 'neutro',
-    magnitude: clampMagnitude(raw.impacto_fiscal?.magnitude),
-    nota: cleanText(raw.impacto_fiscal?.nota) || '',
+    magnitude: fiscalMagnitude,
+    valor_anual_bi: Number.isFinite(annualFiscal) && annualFiscal >= 0 && (annualFiscal > 0 || fiscalMagnitude === 0)
+      ? Math.min(5000, annualFiscal)
+      : (FISCAL_MAGNITUDE_REAIS[fiscalMagnitude] ?? 0) / 1e9,
+    nota: cleanText(raw.impacto_fiscal?.nota, true) || '',
   };
 
-  // ---------- Intensidade ----------
   const intens = Number(raw.intensidade);
   if (!Number.isInteger(intens) || intens < 0 || intens > 3) {
     warnings.push(`Intensidade "${raw.intensidade}" fora de 0–3; usando 1.`);
@@ -293,7 +289,6 @@ export function validateAnalysis(
     out.intensidade = intens as 0 | 1 | 2 | 3;
   }
 
-  // ---------- Posição ideológica ----------
   const pos = Number(raw.posicao_ideologica);
   if (!Number.isFinite(pos)) {
     out.posicao_ideologica = 0;
@@ -301,7 +296,6 @@ export function validateAnalysis(
     out.posicao_ideologica = Math.max(-3, Math.min(3, pos));
   }
 
-  // ---------- Estados-alvo ----------
   if (Array.isArray(raw.estados_alvo) && raw.estados_alvo.length > 0) {
     const valid = raw.estados_alvo.filter((s) =>
       STATE_IDS.includes(s as StateId),
@@ -317,12 +311,10 @@ export function validateAnalysis(
     out.estados_alvo = undefined;
   }
 
-  // ---------- Grupos ----------
   const { groups, groupWarnings } = validateGroups(raw.grupos);
-  out.grupos = groups;
+  out.grupos = enforceGroupTradeoffs(groups, opts.proposalText ?? '', raw.impacto_fiscal?.magnitude, warnings);
   warnings.push(...groupWarnings);
 
-  // ---------- Indicadores ----------
   const { indicators, indicatorWarnings, indicatorRejected } =
     validateIndicators(raw.indicadores, {
       currentValues: opts.currentValues,
@@ -332,7 +324,6 @@ export function validateAnalysis(
   warnings.push(...indicatorWarnings);
   rejected.push(...indicatorRejected);
 
-  // ---------- Risco jurídico ----------
   if (!raw.risco_juridico || !VALID_LEGAL_RISK.has(raw.risco_juridico)) {
     warnings.push(`Risco jurídico "${raw.risco_juridico}" inválido; usando "baixo".`);
     out.risco_juridico = 'baixo';
@@ -342,7 +333,6 @@ export function validateAnalysis(
 
   out.assessoria_juridica = cleanText(raw.assessoria_juridica) || '';
 
-  // ---------- Áreas ----------
   if (raw.area_principal && !VALID_AREAS.has(raw.area_principal)) {
     out.area_principal = undefined;
   }
@@ -352,7 +342,6 @@ export function validateAnalysis(
     );
   }
 
-  // ---------- Duração ----------
   const impl = Number(raw.implementationMonths);
   out.implementationMonths =
     Number.isFinite(impl) && impl >= 0 ? Math.min(24, Math.round(impl)) : 0;
@@ -368,21 +357,19 @@ export function validateAnalysis(
   out.durationMonths =
     Number.isFinite(dur) && dur > 0 ? Math.round(dur) : 0;
 
-  // ---------- Arrays de texto ----------
   out.beneficios = sanitizeStringArray(raw.beneficios);
   out.riscos = sanitizeStringArray(raw.riscos);
   out.efeitos_colaterais = sanitizeStringArray(raw.efeitos_colaterais);
   out.objetivo = cleanText(raw.objetivo);
 
-  // ---------- Coerência fiscal ----------
   applyFiscalCoherence(out, warnings);
+
+  if (warnings.length > 0) {
+    out.warnings = warnings;
+  }
 
   return { analysis: out, warnings, rejected };
 }
-
-// ============================================================
-// 4. VALIDAÇÃO DE GRUPOS
-// ============================================================
 
 function validateGroups(
   raw: Record<string, number> | undefined,
@@ -409,10 +396,6 @@ function validateGroups(
   return { groups: out, groupWarnings };
 }
 
-// ============================================================
-// 5. VALIDAÇÃO DE INDICADORES
-// ============================================================
-
 interface ValidateIndicatorsOpts {
   currentValues?: Record<string, number>;
   hasEstadoAlvo: boolean;
@@ -437,13 +420,11 @@ function validateIndicators(
   for (const [id, val] of Object.entries(raw)) {
     const ind = INDICATORS[id];
 
-    // Indicador não existe
     if (!ind) {
       indicatorRejected.push(`Indicador desconhecido: "${id}".`);
       continue;
     }
 
-    // Indicador fiscal controlado pelo motor
     if (FISCAL_CONTROLLED.has(id)) {
       indicatorRejected.push(
         `Indicador "${id}" é controlado pelo impacto fiscal — removido.`,
@@ -451,7 +432,6 @@ function validateIndicators(
       continue;
     }
 
-    // Medida regional não pode mexer em indicador nacional puro
     if (opts.hasEstadoAlvo && ind.scope === 'national') {
       indicatorRejected.push(
         `Indicador "${id}" é nacional — ignorado em medida regional.`,
@@ -462,7 +442,6 @@ function validateIndicators(
     const n = Number(val);
     if (!Number.isFinite(n) || n === 0) continue;
 
-    // Clamp por percentual do valor atual
     let clamped = n;
     const current = opts.currentValues?.[id];
     if (typeof current === 'number' && current !== 0) {
@@ -475,7 +454,16 @@ function validateIndicators(
       }
     }
 
-    // Respeita min/max do catálogo
+    const minAbs = INDICATOR_DELTA_MIN[id];
+    if (minAbs !== undefined && clamped !== 0 && Math.abs(clamped) < minAbs) {
+      const sign = Math.sign(clamped);
+      const antes = clamped;
+      clamped = sign * minAbs;
+      indicatorWarnings.push(
+        `Indicador ${id}: delta ${antes} ajustado para o mínimo viável (${clamped}).`,
+      );
+    }
+
     if (typeof current === 'number') {
       const next = current + clamped;
       if (next > ind.max) clamped = ind.max - current;
@@ -489,19 +477,6 @@ function validateIndicators(
   return { indicators: out, indicatorWarnings, indicatorRejected };
 }
 
-// ============================================================
-// 6. COERÊNCIA FISCAL
-// ============================================================
-
-/**
- * Regras de coerência:
- *   - Se o impacto é custo, o texto não pode declarar que a medida
- *     "reduz a dívida" ou "aumenta o superávit" sem contrapartida.
- *   - Se o impacto é economia, não pode declarar o oposto.
- *
- * Ajustamos o texto de notas para não criar contradição direta
- * com os efeitos declarados.
- */
 function applyFiscalCoherence(
   analysis: AIInterpretation,
   warnings: string[],
@@ -523,26 +498,21 @@ function applyFiscalCoherence(
     );
   }
 
-  // Se a IA declarou "neutro" mas a magnitude > 0, reclassifica para custo
-  if (tipo === 'neutro' && analysis.impacto_fiscal.magnitude > 0) {
+  const annualBi = analysis.impacto_fiscal.valor_anual_bi ?? 0;
+  if (tipo === 'neutro' && (analysis.impacto_fiscal.magnitude > 0 || annualBi > 0)) {
     analysis.impacto_fiscal.tipo = 'custo';
     warnings.push(
       'Tipo fiscal "neutro" com magnitude > 0; reclassificado como "custo".',
     );
   }
 
-  // Se a IA declarou custo/economia mas magnitude = 0, reclassifica para neutro
-  if (tipo !== 'neutro' && analysis.impacto_fiscal.magnitude === 0) {
+  if (tipo !== 'neutro' && analysis.impacto_fiscal.magnitude === 0 && annualBi === 0) {
     analysis.impacto_fiscal.tipo = 'neutro';
     warnings.push(
       'Magnitude 0; tipo fiscal reclassificado para "neutro".',
     );
   }
 }
-
-// ============================================================
-// 7. HELPERS
-// ============================================================
 
 function clampMagnitude(m: unknown): FiscalMagnitude {
   const n = Number(m);
@@ -553,18 +523,77 @@ function clampMagnitude(m: unknown): FiscalMagnitude {
   return i as FiscalMagnitude;
 }
 
-function cleanText(s: unknown): string {
+function cleanText(s: unknown, redactCurrency = false): string {
   if (typeof s !== 'string') return '';
   let out = s.trim();
 
-  // Remove números monetários exatos (a IA inventa valores)
-  // Ex.: "R$ 1.412,00", "R$ 40 bilhões"  →   mantém só o qualitativo
-  out = out.replace(/R\$\s?[\d.,]+(?:\s?(?:mil|milh[õo]es|bilh[õo]es|trilh[õo]es))?/gi, 'R$ [valor]');
+  if (redactCurrency) {
+    out = out.replace(/R\$\s?[\d.,]+(?:\s?(?:mil|milh[õo]es|bilh[õo]es|trilh[õo]es))?/gi, 'R$ [valor]');
+  }
 
-  // Colapsa espaços duplos
   out = out.replace(/\s{2,}/g, ' ');
 
   return out;
+}
+
+function normalizeText(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function enforceGroupTradeoffs(
+  input: Record<string, number>,
+  proposal: string,
+  fiscalMagnitude: unknown,
+  warnings: string[],
+): Record<string, number> {
+  const groups = { ...input };
+  const text = normalizeText(proposal);
+  const beneficiaries = new Set<string>();
+
+  if (/salario minimo|piso salarial|reajuste salarial|aumento salarial|direitos trabalhistas|beneficio previdenciario|aposentador|seguro desemprego/.test(text)) {
+    beneficiaries.add('trabalhadores');
+    if (/previd|aposent|salario minimo/.test(text)) beneficiaries.add('aposentados');
+  }
+  if (/emprego|contratacao|qualificacao profissional/.test(text)) {
+    beneficiaries.add('trabalhadores');
+    beneficiaries.add('jovens');
+  }
+  if (/bolsa|transferencia de renda|renda basica|combate a pobreza/.test(text)) {
+    beneficiaries.add('trabalhadores');
+    beneficiaries.add('aposentados');
+    beneficiaries.add('jovens');
+  }
+  if (/reducao de impostos? para empresas|desoneracao|credito para empresas|subsidio ao agronegocio/.test(text)) {
+    beneficiaries.add('empresarios');
+    beneficiaries.add('agronegocio');
+  }
+  if (/investimento em universidades|universidades publicas|pesquisa cientifica|bolsa de pesquisa/.test(text)) {
+    beneficiaries.add('universitarios');
+    beneficiaries.add('ciencia');
+  }
+
+  for (const id of beneficiaries) {
+    if (groups[id] !== undefined && groups[id] < 0) {
+      groups[id] = Math.abs(groups[id]);
+      warnings.push(`Sinal de ${id} invertido: a proposta indica benefício direto ao grupo.`);
+    }
+  }
+
+  const positives = Object.entries(groups).filter(([, delta]) => delta > 0);
+  const hasNegative = Object.values(groups).some((delta) => delta < 0);
+  const magnitude = Number(fiscalMagnitude);
+  if (!Number.isFinite(magnitude) || magnitude < 4 || positives.length < 2 || hasNegative) return groups;
+
+  const payers = /salario|piso|trabalh|previd|bolsa|renda|beneficio|gasto|despesa|subsidio/.test(text)
+    ? ['empresarios', 'mercado_financeiro']
+    : /imposto|tribut|desoner|empresa|agronegocio/.test(text)
+      ? ['mercado_financeiro', 'servidores_publicos']
+      : ['empresarios', 'mercado_financeiro'];
+  for (const [id, delta] of positives) groups[id] = delta * 0.7;
+  const payer = payers.find((id) => !(id in groups)) ?? payers[0];
+  groups[payer] = -4;
+  warnings.push(`Trade-off fiscal aplicado: deltas positivos reduzidos em 30% e ${payer} recebeu delta -4.`);
+  return groups;
 }
 
 function sanitizeStringArray(arr: unknown): string[] | undefined {
@@ -575,10 +604,6 @@ function sanitizeStringArray(arr: unknown): string[] | undefined {
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
-// ============================================================
-// 8. ENTRADA DE ALTO NÍVEL
-// ============================================================
-
 export interface ProcessedResponse {
   kind: 'query' | 'analysis';
   query?: AIQueryRequest;
@@ -587,9 +612,6 @@ export interface ProcessedResponse {
   rejected: string[];
 }
 
-/**
- * Combina parse + validate. É o ponto de entrada que o `policyAI.ts` usa.
- */
 export function processResponse(
   raw: string,
   opts: ValidationOptions = {},
@@ -615,14 +637,6 @@ export function processResponse(
   };
 }
 
-// ============================================================
-// 9. FALLBACK / DEFAULTS
-// ============================================================
-
-/**
- * Cria uma análise mínima quando a IA falha completamente.
- * Não inventa efeitos — só preenche o mínimo pra UI não quebrar.
- */
 export function fallbackAnalysis(
   proposalText: string,
   reason: string,

@@ -212,6 +212,7 @@ function buildNationalContext(
     approvalTrend: computeTrend(approvalSeries),
     macro,
     fiscal,
+    indicators: input.nationalIndicators,   // 👈 NOVA LINHA
   };
 }
 

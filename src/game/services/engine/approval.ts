@@ -5,6 +5,7 @@ import { GROUP_SENSITIVITY } from '../../data/groupSensitivity';
 import { getIndicator } from '../../data/indicators';
 import { STATE_IDS, STATES, type StateId } from '../../data/states';
 import type { ActivePolicy } from '../../types/policy';
+import type { ContextSnapshot } from '../../types/ai';
 
 // ============================================================
 // CONSTANTES
@@ -17,14 +18,121 @@ export const NEUTRAL = 50;
 export const clampApproval = (n: number) =>
   Math.min(APPROVAL_MAX, Math.max(APPROVAL_MIN, Number.isFinite(n) ? n : NEUTRAL));
 
-/** Velocidade de drift ao baseline (0.02 = meia-vida ~35 meses). */
-const BASELINE_DRIFT_RATE = 0.02;
+/** Velocidade de drift reduzida para preservar efeitos de medidas por mais tempo. */
+const BASELINE_DRIFT_RATE = 0.012;
+const NATIONAL_APPROVAL_INERTIA = 0.35;
 
 /** Quanto da sensibilidade bruta vira mudança efetiva por turno. */
 const SENSITIVITY_RATE = 0.25;
 
 /** Marca permanente de uma política no baseline (25% do choque inicial). */
 const POLICY_MARK_RATE = 0.25;
+const STATE_WELLBEING_SHIFT_MAX = 10;
+const STATE_APPROVAL_ADJUSTMENT_RATE = 0.3;
+
+type WellbeingMetric = {
+  id: string;
+  min: number;
+  max: number;
+  direction: 'up' | 'down';
+};
+
+const STATE_WELLBEING_CATEGORIES: Array<{
+  weight: number;
+  metrics: WellbeingMetric[];
+}> = [
+  {
+    weight: 0.25,
+    metrics: [
+      { id: 'acesso_saude', min: 0, max: 100, direction: 'up' },
+      { id: 'satisfacao_saude', min: 0, max: 100, direction: 'up' },
+      { id: 'cobertura_vacinacao', min: 0, max: 100, direction: 'up' },
+      { id: 'tempo_espera_saude', min: 0, max: 180, direction: 'down' },
+    ],
+  },
+  {
+    weight: 0.2,
+    metrics: [
+      { id: 'frequencia_escolar', min: 0, max: 100, direction: 'up' },
+      { id: 'conclusao_medio', min: 0, max: 100, direction: 'up' },
+      { id: 'alfabetizacao', min: 0, max: 100, direction: 'up' },
+      { id: 'evasao_escolar', min: 0, max: 30, direction: 'down' },
+    ],
+  },
+  {
+    weight: 0.25,
+    metrics: [
+      { id: 'percepcao_seguranca', min: 0, max: 100, direction: 'up' },
+      { id: 'homicidios', min: 0, max: 60, direction: 'down' },
+      { id: 'roubos', min: 0, max: 1000, direction: 'down' },
+      { id: 'crimes_solucionados', min: 0, max: 100, direction: 'up' },
+    ],
+  },
+  {
+    weight: 0.2,
+    metrics: [
+      { id: 'renda_media', min: 0, max: 8000, direction: 'up' },
+      { id: 'pobreza', min: 0, max: 70, direction: 'down' },
+      { id: 'pobreza_extrema', min: 0, max: 30, direction: 'down' },
+      { id: 'desemprego', min: 0, max: 25, direction: 'down' },
+      { id: 'gini', min: 0.3, max: 0.7, direction: 'down' },
+    ],
+  },
+  {
+    weight: 0.1,
+    metrics: [
+      { id: 'acesso_agua', min: 0, max: 100, direction: 'up' },
+      { id: 'coleta_esgoto', min: 0, max: 100, direction: 'up' },
+      { id: 'tratamento_esgoto', min: 0, max: 100, direction: 'up' },
+      { id: 'qualidade_estradas', min: 0, max: 100, direction: 'up' },
+      { id: 'acesso_internet', min: 0, max: 100, direction: 'up' },
+      { id: 'qualidade_transporte', min: 0, max: 100, direction: 'up' },
+      { id: 'tempo_deslocamento', min: 0, max: 120, direction: 'down' },
+    ],
+  },
+];
+
+type StateIndicatorValues = Record<StateId, Record<string, number>>;
+
+function stateWellbeingScore(values: Record<string, number>): number {
+  let score = 0;
+  let availableWeight = 0;
+
+  for (const category of STATE_WELLBEING_CATEGORIES) {
+    const metricScores: number[] = [];
+    for (const metric of category.metrics) {
+      const value = values[metric.id];
+      if (!Number.isFinite(value)) continue;
+      const normalized = Math.max(0, Math.min(1, (value - metric.min) / (metric.max - metric.min)));
+      metricScores.push((metric.direction === 'up' ? normalized : 1 - normalized) * 100);
+    }
+    if (metricScores.length === 0) continue;
+    score += (metricScores.reduce((sum, current) => sum + current, 0) / metricScores.length) * category.weight;
+    availableWeight += category.weight;
+  }
+
+  return availableWeight > 0 ? score / availableWeight : 50;
+}
+
+function averagedStateWellbeingScores(
+  stateIndicators: StateIndicatorValues,
+  history: ContextSnapshot[],
+  currentStateIndicators?: StateIndicatorValues,
+): Record<StateId, number> {
+  const recentSnapshots = history.slice(-1);
+  const scores = {} as Record<StateId, number>;
+
+  for (const sid of STATE_IDS) {
+    const stateSamples = recentSnapshots
+      .map((snapshot) => snapshot.states?.find((state) => state.id === sid)?.values)
+      .filter((values): values is Record<string, number> => !!values);
+    if (currentStateIndicators?.[sid]) stateSamples.push(currentStateIndicators[sid]);
+    stateSamples.push(stateIndicators[sid] ?? {});
+    scores[sid] = stateSamples.reduce((sum, values) => sum + stateWellbeingScore(values), 0) / stateSamples.length;
+  }
+
+  return scores;
+}
 
 // ============================================================
 // BASELINE
@@ -79,7 +187,7 @@ export function countIdleMonths(
 }
 
 export function idleDrift(idleMonths: number): number {
-  return idleMonths <= 0 ? 0 : -Math.min(3, 1 + Math.floor(idleMonths / 2));
+  return idleMonths <= 0 ? 0 : -Math.min(1.8, 0.6 * (1 + Math.floor(idleMonths / 2)));
 }
 
 // ============================================================
@@ -151,6 +259,7 @@ export function indicatorSensitivityDelta(
 
 export interface ApprovalTurnInput {
   groupApprovals: Record<string, number>;
+  previousNationalApproval?: number;
   govIdeology: number;
   activePolicies: ActivePolicy[];
   indicatorDeltas: IndicatorDeltas;
@@ -214,7 +323,11 @@ export function runApprovalTurn(input: ApprovalTurnInput): ApprovalTurnResult {
     approvals,
     baselines,
     log,
-    nationalApproval: computeNationalApproval(approvals),
+    nationalApproval: input.previousNationalApproval === undefined
+      ? computeNationalApproval(approvals)
+      : clampApproval(input.previousNationalApproval + (
+        computeNationalApproval(approvals) - input.previousNationalApproval
+      ) * NATIONAL_APPROVAL_INERTIA),
   };
 }
 
@@ -258,13 +371,44 @@ export function computeNationalApproval(
 export function computeStateApprovals(
   nationalApproval: number,
   govIdeology: number,
+  stateIndicators?: StateIndicatorValues,
+  history: ContextSnapshot[] = [],
+  previousApprovals?: Record<StateId, number>,
+  currentStateIndicators?: StateIndicatorValues,
 ): Record<StateId, number> {
   const out = {} as Record<StateId, number>;
+  const wellbeingScores = stateIndicators
+    ? averagedStateWellbeingScores(stateIndicators, history, currentStateIndicators)
+    : null;
+  let nationalWellbeing = 50;
+  if (wellbeingScores) {
+    const totalPopulation = STATE_IDS.reduce((sum, sid) => sum + STATES[sid].population, 0);
+    nationalWellbeing = STATE_IDS.reduce(
+      (sum, sid) => sum + wellbeingScores[sid] * STATES[sid].population,
+      0,
+    ) / totalPopulation;
+  }
+
   for (const sid of STATE_IDS) {
     const inclination = STATES[sid].politicalInclination;
     const alignment = -inclination * (govIdeology / 3);
-    const shift = alignment * 12;
-    out[sid] = clampApproval(nationalApproval + shift);
+    const ideologyShift = alignment * 12;
+    let wellbeingShift = 0;
+
+    if (wellbeingScores) {
+      const absoluteShift = ((wellbeingScores[sid] - 50) / 50) * STATE_WELLBEING_SHIFT_MAX;
+      const relativeShift = ((wellbeingScores[sid] - nationalWellbeing) / 50) * STATE_WELLBEING_SHIFT_MAX;
+      wellbeingShift = Math.max(
+        -STATE_WELLBEING_SHIFT_MAX,
+        Math.min(STATE_WELLBEING_SHIFT_MAX, relativeShift * 0.7 + absoluteShift * 0.3),
+      );
+    }
+
+    const target = clampApproval(nationalApproval + ideologyShift + wellbeingShift);
+    const previous = previousApprovals?.[sid];
+    out[sid] = previous === undefined
+      ? target
+      : clampApproval(previous + (target - previous) * STATE_APPROVAL_ADJUSTMENT_RATE);
   }
   return out;
 }

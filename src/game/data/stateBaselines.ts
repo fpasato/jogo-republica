@@ -2,6 +2,7 @@ import type { IndicatorDef } from './indicators';
 import { getIndicator, hasIndicator } from './indicators';
 import type { StateId, StateStructural } from './states';
 import { STATES } from './states';
+import { estimateStateIdh } from './idh';
 
 type Spec = (s: StateStructural) => number;
 
@@ -100,6 +101,7 @@ const BASE: Record<string, number> = {
 
   // Política
   satisfacao_servicos: 50,
+  idh: 0.7, // recalculado por estado a partir de saúde, educação e renda
 };
 
 // ============================================================
@@ -169,12 +171,14 @@ const REGION_DELTA: Record<string, Record<string, number>> = {
 const STATE_OVERRIDE: Partial<Record<StateId, Record<string, number>>> = {
   SP: {
     desemprego: -1.5, informalidade: -6, renda_media: +400,
-    homicidios: -5, roubos: +50,
+    // Taxa estadual de homicídios por 100 mil habitantes (DATASUS, 2023).
+    homicidios: 6.35, roubos: +50,
     coleta_esgoto: +8, acesso_internet: +5,
     gini: +0.01, tempo_deslocamento: +15,
   },
   RJ: {
-    homicidios: +18, roubos: +250, furtos: +200,
+    // Taxa estadual de homicídios por 100 mil habitantes (DATASUS, 2023).
+    homicidios: 20, roubos: +250, furtos: +200,
     percepcao_seguranca: -15, investigacao_policial: -8, crimes_solucionados: -10,
     capacidade_prisional: -15, tempo_resposta_policial: +6,
     renda_media: -200, pobreza: +5,
@@ -309,6 +313,10 @@ function buildForState(state: StateStructural): Record<string, number> {
       out[id] = clampToCatalog(id, value);
     }
   }
+
+  // Proxy do IDH para o jogo: média geométrica de saúde, educação e renda.
+  // Não pretende reproduzir o cálculo oficial, que exige outros dados.
+  out.idh = estimateStateIdh(out);
 
   return out;
 }

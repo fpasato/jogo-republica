@@ -50,6 +50,7 @@ export interface ChatOptions {
   signal?: AbortSignal;
   baseUrl?: string;
   numPredict?: number;
+  numCtx?: number;
 }
 
 export interface ChatResult {
@@ -106,7 +107,7 @@ export async function chat(
     format: 'json',
     options: {
       temperature: options.temperature ?? 0.7,
-      num_ctx: 6144,
+      num_ctx: options.numCtx ?? 8192,
       num_predict: options.numPredict ?? 512,
       repeat_penalty: 1.05,
       ...(options.top_p !== undefined ? { top_p: options.top_p } : {}),

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import type { StageResult, VotingOutcome, VoteValue } from '../../../../game/services/votingService';
+import type { StageResult, VotingOutcome, VoteValue } from '../../../../game/services/parliament/votingService';
 import styles from './styles.module.css';
 
 interface Props {
     /** Resultado já calculado: a tela só anima, não sorteia nada. Pode ser null enquanto calcula. */
     outcome: VotingOutcome | null;
     policyName?: string;
-    onFinish: (outcome: VotingOutcome) => void;
+    onFinish: (outcome: VotingOutcome) => void | Promise<void>;
+    error?: string | null;
+    onCancel?: () => void;
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -23,7 +25,7 @@ const VOTE_LABEL: Record<VoteValue, string> = {
 
 const HOLD_MS = 1200; // pausa depois de preencher uma casa, antes da próxima
 
-export function VotingScreen({ outcome, policyName, onFinish }: Props) {
+export function VotingScreen({ outcome, policyName, onFinish, error, onCancel }: Props) {
     const [stageIndex, setStageIndex] = useState(0);
     const [revealed, setRevealed] = useState(0);
     const [done, setDone] = useState(false);
@@ -86,7 +88,12 @@ export function VotingScreen({ outcome, policyName, onFinish }: Props) {
                             <h2 className={styles.title}>{policyName || 'Medida'}</h2>
                         </div>
                     </header>
-                    <p className={styles.muted}>Calculando votos...</p>
+                    {error ? (
+                        <>
+                            <p className={styles.muted}>{error}</p>
+                            <button type="button" className={styles.continue} onClick={onCancel}>Voltar à proposta</button>
+                        </>
+                    ) : <p className={styles.muted}>Calculando votos...</p>}
                 </div>
             </div>
         );
@@ -166,8 +173,8 @@ export function VotingScreen({ outcome, policyName, onFinish }: Props) {
                                 ))}
                             </ul>
                         </div>
-                        <button type="button" className={styles.continue} onClick={() => onFinish(outcome)}>
-                            {outcome.approved ? 'Aplicar medida e avançar mês' : 'Avançar mês'}
+                        <button type="button" className={styles.continue} onClick={() => { void onFinish(outcome); }}>
+                            {outcome.approved ? 'Aplicar medida e avançar mês' : 'Voltar à criação de medida'}
                         </button>
                     </section>
                 )}

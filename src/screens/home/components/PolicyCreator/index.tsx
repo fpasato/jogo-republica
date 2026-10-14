@@ -215,6 +215,7 @@ function AnalysisBlock({ ai }: { ai: AIInterpretation }) {
 
 export interface PolicyCreatorProps {
   onConfirm?: (policy: PendingPolicy) => void;
+  onAdvanceMonth?: () => void | Promise<void>;
   testMode?: boolean;
 }
 
@@ -231,6 +232,7 @@ export interface PendingPolicy {
 
 export function PolicyCreator({
   onConfirm,
+  onAdvanceMonth,
   testMode = false,
 }: PolicyCreatorProps) {
   const analyzeProposal = useGameStore((s) => s.analyzeProposal);
@@ -289,7 +291,7 @@ export function PolicyCreator({
 
   const handleConfirm = () => {
     if (!pending) return;
-    onConfirm?.({
+    const policy = {
       instrument: pending.analysis.instrumento,
       name:
         policyName ||
@@ -297,17 +299,22 @@ export function PolicyCreator({
         pending.analysis.interpretacao,
       originalText: pending.text,
       interpretation: pending.analysis,
-    });
-    confirmProposal();
+    };
+    if (onConfirm) onConfirm(policy);
+    else confirmProposal();
     resetForm();
   };
 
-  const handleAdvanceMonth = () => {
+  const handleAdvanceMonth = async () => {
     if (busy) return;
     setIsAdvancing(true);
     resetForm();
-    runMonth();
-    setIsAdvancing(false);
+    try {
+      if (onAdvanceMonth) await onAdvanceMonth();
+      else runMonth();
+    } finally {
+      setIsAdvancing(false);
+    }
   };
 
   // ---------- Derivados ----------
@@ -318,7 +325,9 @@ export function PolicyCreator({
 
   const fiscal = pending?.analysis.impacto_fiscal;
   const fiscalMagnitude = fiscal
-    ? FISCAL_MAGNITUDE_REAIS[fiscal.magnitude] ?? 0
+    ? (fiscal.valor_anual_bi !== undefined
+      ? fiscal.valor_anual_bi * 1e9
+      : FISCAL_MAGNITUDE_REAIS[fiscal.magnitude] ?? 0)
     : 0;
   const fiscalAnual =
     fiscal?.tipo === 'custo'

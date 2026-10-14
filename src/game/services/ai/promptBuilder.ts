@@ -1,7 +1,6 @@
 import { INDICATORS, INDICATOR_IDS } from '../../data/indicators';
 import { GROUP_IDS } from '../../data/groups';
 import { INSTRUMENTS } from '../../data/catalog';
-import { QUERY_MENU_TEXT } from '../../data/queryCatalog';
 import type {
   PolicyContext,
   QueryResult,
@@ -21,12 +20,12 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 // ============================================================
-// SYSTEM PROMPT (fixo — não muda entre turnos)
+// SYSTEM PROMPT (fonte única de verdade)
 // ============================================================
 //
-// Este prompt é grande de propósito: é onde vivem TODAS as regras
-// fixas do jogo. O prompt do usuário (mais abaixo) fica pequeno e
-// focado no turno atual.
+// Todas as regras fixas do jogo vivem aqui. As fases (initial e
+// analysis) compartilham o MESMO system prompt; só o user muda.
+// Isso evita o problema de "duas regras conflitantes".
 
 const SYSTEM_PROMPT = `Você é o analista político do jogo Presidente. Analise a proposta e devolva apenas JSON válido no formato solicitado. Não peça consultas. Seja conciso: no máximo 2 benefícios, 2 riscos e 3 efeitos de indicadores.
 
@@ -37,11 +36,12 @@ const SYSTEM_PROMPT = `Você é o analista político do jogo Presidente. Analise
 3. Indicadores com escopo "estadual" são aplicados em todos os estados, a menos que "estados_alvo" seja informado.
 4. A medida pode ter custo, economia ou ser neutra. A magnitude fiscal segue a escala abaixo.
 5. Não calcule os efeitos finais — você ESTIMA, o motor do jogo valida e aplica.
-6. Se não houver informação suficiente, use o formato de consulta (fase 1). Não invente.
+6. Se faltar informação, faça uma estimativa conservadora e indique a incerteza em "riscos".
 
 ## ESCALA DE MAGNITUDE FISCAL
 
 Impacto anual em reais:
+- \`valor_anual_bi\`: estimativa numérica exata em R$ bilhões por ano (ex.: 300 para economia de R$ 300 bilhões/ano).
 - 0 = R$ 0 (neutro, sem impacto fiscal)
 - 1 = R$ 1 bilhão (micro — categoria, piloto)
 - 2 = R$ 5 bilhões (pequeno — setor específico)
@@ -69,23 +69,7 @@ Use exatamente esses ids no campo "grupos".
 
 ## FORMATO DE SAÍDA
 
-### Fase 1 (consulta — use SOMENTE se faltar informação essencial)
-
-Você pode pedir dados adicionais. Limite: 8 consultas por rodada, 2 rodadas máximas.
-
-Consultas disponíveis:
-${QUERY_MENU_TEXT.split('\n').slice(0, 8).join('\n')}
-
-Se precisar consultar:
-{
-  "phase": "query",
-  "reasoning": "por que preciso desses dados",
-  "queries": [ { "type": "national_indicators", "ids": ["acesso_saude"] } ]
-}
-
-Se já tiver informação suficiente, pule direto para a fase 2.
-
-### Fase 2 (análise — formato final)
+### Análise (formato final)
 
 {
   "phase": "analysis",
@@ -96,6 +80,7 @@ Se já tiver informação suficiente, pule direto para a fase 2.
     "impacto_fiscal": {
       "tipo": "neutro" | "custo" | "economia",
       "magnitude": 0,
+      "valor_anual_bi": 0,
       "nota": "explicação curta em reais"
     },
     "intensidade": 0,
@@ -118,84 +103,62 @@ Se já tiver informação suficiente, pule direto para a fase 2.
   }
 }
 
+## REGRAS OBRIGATÓRIAS PARA DELTAS EM "indicadores"
+
+1. Todo valor em "indicadores" é a MUDANÇA (delta), nunca o valor final.
+   Ex.: salário atual R$ 1.412 → proposta "aumentar para R$ 1.800" →
+   salario_minimo: 388 (NÃO 1800).
+
+2. Unidades dos indicadores (respeite a unidade do catálogo):
+   - salario_minimo: delta em R$ (ex.: +50, +100, +200)
+   - pib_nominal, divida_publica, receitas_publicas, gastos_publicos,
+     saldo_orcamentario, balanca_comercial: delta em R$ bilhões
+   - inflacao, desemprego, carga_tributaria, crescimento_pib, selic:
+     delta em PONTOS PERCENTUAIS (ex.: -0.3, +1.2)
+   - cotacao_dolar: delta em R$/US$ (ex.: +0.15, -0.30)
+   - poder_compra, informalidade: delta na escala 0-100 (ex.: +2, -1.5)
+
+3. Quando o usuário citar valor-alvo ABSOLUTO, calcule o delta subtraindo
+   o valor atual (veja "Valores atuais dos indicadores" no contexto).
+   Ex.: "salário para R$ 1.800" com atual 1412 → salario_minimo: 388.
+
+4. Quando o usuário citar PERCENTUAL, aplique sobre o valor atual.
+   Ex.: "aumentar salário em 10%" com atual 1412 → salario_minimo: 141.
+
+5. Quando NÃO citar valor nem percentual, use faixa realista:
+   - salario_minimo: +20 a +80
+   - inflacao: -0.5 a +0.5 p.p.
+   - pib_nominal: -50 a +100 (R$ bi)
+   - divida_publica: -30 a +50 (R$ bi)
+   - carga_tributaria: -0.5 a +0.5 p.p.
+
+6. Mínimos absolutos aceitáveis (abaixo disso é RUÍDO, não medida):
+   - salario_minimo: 20 reais
+   - receitas_publicas, gastos_publicos: 5 R$ bi
+   - NUNCA use 1 ou 2 para esses indicadores.
+
+7. Se a proposta NÃO tem efeito claro sobre um indicador, OMITA-o em vez
+   de retornar 0.
+
+8. Se o instrumento for MP (medida provisória) ou lei, use
+   implementationMonths ≥ 1 e effectRampUpMonths ≥ 2 por padrão, salvo se
+   a proposta for explicitamente imediata.
+
 ## SEMÂNTICA DOS CAMPOS
 
-- **intensidade**: 0 (sem choque) a 3 (choque extremo). Mede reação política imediata.
-  - 0 = passa sem abalar ninguém
-  - 1 = alguns grupos sentem, mas o país segue calmo
-  - 2 = quem perde sente no ato, clima político esquenta
-  - 3 = medida extrema, país inteiro tensionado
-
-- **posicao_ideologica**: -3 (extrema esquerda) a +3 (extrema direita).
-
-- **grupos**: delta de aprovação de cada grupo afetado.
-  - Positivo = grupo aprova mais
-  - Negativo = grupo aprova menos
-  - Escala: ±1 (pequeno), ±3 (moderado), ±6 (grande), ±10 (raro, medida histórica)
-  - Grupos não listados = sem reação
-
-- **indicadores**: delta TOTAL ao longo de \`effectRampUpMonths\`.
-  - Positivo = indicador sobe, negativo = indicador cai
-  - Escala: cerca de 5% a 20% do valor atual, dependendo da magnitude da medida
-  - Ex: "reduzir homicídios" com magnitude 4 → homicidios: -3 (queda absoluta de 3 unidades)
-
-- **estados_alvo**: liste apenas se a medida for regional. Ausente = nacional.
-
-- **implementationMonths**: 0 (imediato) a 24. Tempo até começar a aplicar.
-- **effectRampUpMonths**: 0 (aplica tudo de uma vez) a 36. Tempo até efeito pleno.
-- **durationType**: "permanent" (padrão) ou "temporary" (com durationMonths).
+- \`intensidade\`: reação política imediata, de 0 (nenhuma) a 3 (extrema).
+- \`posicao_ideologica\`: escala de -3 (esquerda) a +3 (direita).
+- \`grupos\`: deltas de aprovação; positivo aumenta, negativo reduz. Use ±1 (pequeno), ±3 (moderado), ±6 (grande); omita grupos sem reação.
+- \`indicadores\`: deltas totais durante \`effectRampUpMonths\`; omita indicadores sem efeito claro.
+- \`estados_alvo\`: informe somente para medida regional; ausente significa nacional.
+- \`implementationMonths\`: 0–24 meses até começar; \`effectRampUpMonths\`: 0–36 meses até efeito pleno.
+- \`durationType\`: \`permanent\` por padrão ou \`temporary\` com \`durationMonths\`.
 
 ## DIRETRIZES DE QUALIDADE
 
-- Se a proposta for vaga, escolha o instrumento mais conservador e a menor magnitude.
-- Se a proposta for ambiciosa e bem descrita, use magnitude e intensidade maiores.
-- Se um grupo claramente se beneficia, dê +1 a +3. Se claramente se prejudica, dê -1 a -3.
-- Evite deltas exagerados em indicadores que não foram o foco da medida.
-- Se a medida conflita com política ativa, mencione em "efeitos_colaterais".
-- "assessoria_juridica" deve ser uma frase curta, técnica.
+Para grupos, sempre dê sinal positivo (+4 a +10) ao grupo diretamente beneficiado e sinal negativo a quem paga o custo. Exemplo: aumento do salário mínimo beneficia trabalhadores; \`trabalhadores: -6\` está ERRADO. Medidas estruturais podem usar +6 a +12 no alvo e -4 a -8 em quem paga.
 
-## EXEMPLO
-
-Proposta: "Aumentar o salário mínimo em 10% a partir do próximo mês"
-
-{
-  "phase": "analysis",
-  "analysis": {
-    "interpretacao": "Reajuste de 10% no salário mínimo, elevando de R$ 1.412 para R$ 1.553.",
-    "instrumento": "projeto_lei",
-    "motivo_instrumento": "Reajuste do mínimo exige lei ordinária; não é matéria de decreto nem de urgência constitucional.",
-    "impacto_fiscal": {
-      "tipo": "custo",
-      "magnitude": 4,
-      "nota": "Impacto anual estimado em ~R$ 40 bilhões (previdência + servidores + abono)."
-    },
-    "intensidade": 2,
-    "posicao_ideologica": -2,
-    "grupos": {
-      "trabalhadores": 5,
-      "aposentados": 3,
-      "empresarios": -3,
-      "mercado_financeiro": -2
-    },
-    "indicadores": {
-      "salario_minimo": 141,
-      "poder_compra": 3,
-      "desemprego": 0.3,
-      "inflacao": 0.4,
-      "informalidade": 0.5
-    },
-    "risco_juridico": "baixo",
-    "assessoria_juridica": "Reajuste está dentro da competência da União; sem risco constitucional relevante.",
-    "objetivo": "Recuperar poder de compra dos trabalhadores",
-    "beneficios": ["Aumento direto da renda", "Redução da pobreza"],
-    "riscos": ["Pressão inflacionária", "Custo fiscal elevado"],
-    "efeitos_colaterais": ["Possível aumento de informalidade"],
-    "effectRampUpMonths": 3,
-    "durationType": "permanent",
-    "area_principal": "economia",
-    "areas_secundarias": ["social"]
-  }
-}`;
+Seja proporcional à proposta. Para propostas vagas, escolha instrumento conservador e efeitos modestos. Use no máximo 2 benefícios, 2 riscos e 3 efeitos de indicadores; assessoria jurídica em uma frase técnica. Se houver conflito com medida ativa, cite em efeitos_colaterais.`;
 
 // ============================================================
 // GERADOR DA LISTA DE INDICADORES
@@ -308,13 +271,65 @@ function formatCrises(ctx: PolicyContext): string {
     .join('\n');
 }
 
+/**
+ * Bloco com os valores atuais dos indicadores — essencial para a IA
+ * calcular deltas quando o jogador cita valores absolutos ou %.
+ */
+function formatCurrentIndicators(
+  indicators: Record<string, number> | undefined,
+): string {
+  if (!indicators) return '  (nenhum disponível)';
+
+  const RELEVANT = [
+    'salario_minimo',
+    'inflacao',
+    'desemprego',
+    'pib_nominal',
+    'divida_publica',
+    'carga_tributaria',
+    'cotacao_dolar',
+    'selic',
+    'receitas_publicas',
+    'gastos_publicos',
+    'saldo_orcamentario',
+    'balanca_comercial',
+    'poder_compra',
+    'investimentos_publicos',
+  ] as const;
+
+  const FISCAL_BI = new Set([
+    'pib_nominal',
+    'divida_publica',
+    'receitas_publicas',
+    'gastos_publicos',
+    'saldo_orcamentario',
+    'balanca_comercial',
+    'investimentos_publicos',
+  ]);
+
+  const DECIMAL_2 = new Set([
+    'salario_minimo',
+    'cotacao_dolar',
+    'selic',
+  ]);
+
+  const lines = RELEVANT.map((id) => {
+    const v = indicators[id];
+    if (v === undefined) return null;
+    if (FISCAL_BI.has(id)) return `  ${id} = ${v.toFixed(0)} (R$ bi)`;
+    if (DECIMAL_2.has(id)) return `  ${id} = ${v.toFixed(2)}`;
+    return `  ${id} = ${v.toFixed(2)}`;
+  }).filter(Boolean) as string[];
+
+  return lines.length > 0 ? lines.join('\n') : '  (nenhum disponível)';
+}
+
 // ============================================================
 // PROMPTS DE USUÁRIO
 // ============================================================
 
 /**
- * Prompt da fase 1 — contexto inicial + proposta.
- * A IA decide se consulta ou analisa direto.
+ * Prompt da análise + contexto da proposta.
  */
 export function buildInitialPrompt(context: PolicyContext): string {
   const profile = context.profile ?? {
@@ -324,6 +339,8 @@ export function buildInitialPrompt(context: PolicyContext): string {
     govIdeology: 0,
     axes: { economia: 0, costumes: 0, seguranca: 0, ambiente: 0, gasto_social: 0 },
   };
+
+  // Contexto compacto para não estourar o prompt
   const compactContext: PolicyContext = {
     ...context,
     national: {
@@ -336,6 +353,7 @@ export function buildInitialPrompt(context: PolicyContext): string {
     activePolicies: context.activePolicies.slice(0, 8),
     history: { ...context.history, indicators: {}, groupApprovals: {}, nationalApproval: [] },
   };
+
   return [
     '# CONTEXTO ATUAL',
     '',
@@ -344,6 +362,10 @@ export function buildInitialPrompt(context: PolicyContext): string {
     '',
     '## Situação nacional',
     formatNational(compactContext),
+    '',
+    '## Valores atuais dos indicadores nacionais',
+    'Use estes valores para calcular deltas quando o jogador citar alvo absoluto ou percentual.',
+    formatCurrentIndicators(compactContext.national.indicators),
     '',
     '## Estados',
     compactContext.states.length ? formatStates(compactContext) : 'Use abrangência nacional, salvo se a proposta citar um estado.',
@@ -366,8 +388,7 @@ export function buildInitialPrompt(context: PolicyContext): string {
     '',
     '# SUA VEZ',
     '',
-    'Se faltar informação essencial, responda com { "phase": "query", ... }.',
-    'Se já tiver o suficiente, responda com { "phase": "analysis", "analysis": { ... } }.',
+    'Produza a análise final no formato { "phase": "analysis", "analysis": { ... } }.',
     '',
     'Responda APENAS com JSON válido. Nada antes, nada depois.',
   ].join('\n');
@@ -400,6 +421,11 @@ export function buildAnalysisPrompt(
     '',
     queryBlock,
     '',
+    '# VALORES ATUAIS DOS INDICADORES',
+    '',
+    'Use estes valores para calcular deltas quando o jogador citar alvo absoluto ou percentual.',
+    formatCurrentIndicators(context.national.indicators),
+    '',
     '# PROPOSTA (recapitulação)',
     '',
     `"${context.proposal}"`,
@@ -414,8 +440,10 @@ export function buildAnalysisPrompt(
 }
 
 // ============================================================
-// EXPORTAÇÃO DE PROMPTS COMPLETOS
+// PAYLOADS (system + user)
 // ============================================================
+//
+// Os builders compartilham as regras de delta do `SYSTEM_PROMPT`.
 
 export interface PromptPayload {
   system: string;
@@ -424,20 +452,8 @@ export interface PromptPayload {
 
 export function buildInitialPayload(context: PolicyContext): PromptPayload {
   return {
-    system: [
-      'Analista político do jogo Presidente. Responda somente JSON, sem markdown nem consultas.',
-      `Instrumentos permitidos: ${INSTRUMENTS.map((i) => i.id).join(', ')}.`,
-      `IDs de indicadores: ${INDICATOR_IDS.join(', ')}. IDs de grupos: ${GROUP_IDS.join(', ')}.`,
-      'Formato obrigatório: {"phase":"analysis","analysis":{"interpretacao":"1-2 frases","instrumento":"id","motivo_instrumento":"curto","impacto_fiscal":{"tipo":"neutro|custo|economia","magnitude":0,"nota":"curta"},"intensidade":1,"posicao_ideologica":0,"grupos":{},"indicadores":{},"estados_alvo":[],"risco_juridico":"baixo|medio|alto","assessoria_juridica":"curta","objetivo":"curto","beneficios":[],"riscos":[],"efeitos_colaterais":[],"implementationMonths":0,"effectRampUpMonths":0,"durationType":"permanent","durationMonths":0,"area_principal":"categoria","areas_secundarias":[]}}',
-      'Use poucos efeitos relevantes e deltas moderados. Magnitude fiscal 0-7. Áreas válidas: economia, saude, educacao, seguranca, infraestrutura, social, ambiente, gestao, politica. No máximo 2 itens em cada lista.',
-    ].join('\n'),
-    user: [
-      `Mês ${context.month}; aprovação ${context.national.approval.toFixed(0)}%.`,
-      `Macros: ${context.national.macro.slice(0, 5).map((m) => `${m.id}=${m.value.toFixed(1)}`).join(', ')}.`,
-      `Perfil: ${context.profile.playerName}, partido ${context.profile.partyAcronym}, ideologia ${context.profile.govIdeology}.`,
-      `Crises: ${context.activeCrises.slice(0, 3).map((c) => c.description).join(' | ') || 'nenhuma'}.`,
-      `Proposta: ${context.proposal}`,
-    ].join('\n'),
+    system: SYSTEM_PROMPT,
+    user: buildInitialPrompt(context),
   };
 }
 
@@ -457,7 +473,80 @@ export function getSystemPrompt(): string {
 }
 
 // ============================================================
-// HELPERS
+// SANITIZAÇÃO PÓS-IA
+// ============================================================
+//
+// Rede de segurança: mesmo com o system prompt correto, alguns
+// modelos locais insistem em devolver deltas absurdamente
+// pequenos. Esta função corrige antes de enviar para o motor.
+
+const MIN_SALARIO_DELTA = 20;         // R$
+const MIN_FISCAL_DELTA_BI = 5;        // R$ bilhões
+const ZERO_THRESHOLD = 0.001;
+
+interface SanitizableAnalysis {
+  indicadores?: Record<string, number>;
+  warnings?: string[];
+}
+
+/**
+ * Corrige deltas de indicadores abaixo do mínimo viável e remove
+ * deltas irrelevantes (< 0.001). Deve ser chamada DEPOIS de parsear
+ * o JSON da IA e ANTES de entregar para o store.
+ *
+ * @param analysis Análise (mutada in-place).
+ * @returns Lista de avisos gerados (também anexada em `analysis.warnings`).
+ */
+export function sanitizeAnalysisDeltas(
+  analysis: SanitizableAnalysis,
+): string[] {
+  const ind = analysis.indicadores ?? {};
+  const warnings: string[] = [];
+
+  // ---- Salário mínimo ----
+  const sal = ind.salario_minimo;
+  if (
+    sal !== undefined &&
+    sal !== 0 &&
+    Math.abs(sal) < MIN_SALARIO_DELTA
+  ) {
+    const sign = Math.sign(sal);
+    const novo = sign * MIN_SALARIO_DELTA;
+    warnings.push(
+      `salario_minimo ajustado de ${sal} para ${novo} (mínimo viável).`,
+    );
+    ind.salario_minimo = novo;
+  }
+
+  // ---- Receitas e gastos públicos ----
+  for (const id of ['receitas_publicas', 'gastos_publicos'] as const) {
+    const v = ind[id];
+    if (v !== undefined && v !== 0 && Math.abs(v) < MIN_FISCAL_DELTA_BI) {
+      const sign = Math.sign(v);
+      const novo = sign * MIN_FISCAL_DELTA_BI;
+      warnings.push(`${id} ajustado de ${v} para ${novo} (mínimo viável).`);
+      ind[id] = novo;
+    }
+  }
+
+  // ---- Remove ruído ----
+  for (const k of Object.keys(ind)) {
+    if (Math.abs(ind[k]) < ZERO_THRESHOLD) {
+      delete ind[k];
+    }
+  }
+
+  // ---- Persiste warnings na análise ----
+  if (warnings.length > 0) {
+    analysis.warnings = [...(analysis.warnings ?? []), ...warnings];
+  }
+
+  analysis.indicadores = ind;
+  return warnings;
+}
+
+// ============================================================
+// HELPERS DE FORMATAÇÃO
 // ============================================================
 
 function fmt(n: number, decimals = 2): string {

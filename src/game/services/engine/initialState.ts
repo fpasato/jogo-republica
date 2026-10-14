@@ -137,6 +137,7 @@ export function buildInitialState(
   const stateApprovals = buildInitialStateApprovals(
     profile.govIdeology,
     groupApprovals,
+    stateIndicators,
   );
   const nationalApproval = computeNationalApproval(
     groupApprovals,
@@ -243,10 +244,11 @@ function buildInitialGroupApprovals(
 function buildInitialStateApprovals(
   govIdeology: number,
   groupApprovals: Record<string, number>,
+  stateIndicators: Record<StateId, Record<string, number>>,
 ): Record<StateId, number> {
   // Aprovação nacional "provisória" a partir dos grupos — só pra alimentar o shift
   const nationalFromGroups = computeNationalApproval(groupApprovals);
-  return computeStateApprovals(nationalFromGroups, govIdeology);
+  return computeStateApprovals(nationalFromGroups, govIdeology, stateIndicators);
 }
 
 // ============================================================

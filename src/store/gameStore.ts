@@ -43,6 +43,12 @@ export interface PendingProposal {
   createdAt: number;
 }
 
+export interface PreparedMonth {
+  game: GameState;
+  log: TurnLog;
+  summary: TurnSummary;
+}
+
 export interface GameStoreState {
   // ---------- Estado do jogo ----------
   game: GameState | null;
@@ -70,11 +76,13 @@ export interface GameStoreState {
 
   // ---------- Turno ----------
   runMonth(): void;
+  prepareMonth(): PreparedMonth | null;
+  commitPreparedMonth(prepared: PreparedMonth): void;
 
   // ---------- Proposta ----------
   analyzeProposal(text: string, options?: PolicyAIOptions): Promise<void>;
   cancelAnalysis(): void;
-  confirmProposal(): void;
+  confirmProposal(proposal?: { text: string; analysis: AIInterpretation; name?: string }): boolean;
   discardProposal(): void;
 
   // ---------- Helpers ----------
@@ -108,7 +116,9 @@ function buildActivePolicy(
   analysis: AIInterpretation,
 ): ActivePolicy {
   const magnitude = analysis.impacto_fiscal.magnitude;
-  const fiscalBase = FISCAL_MAGNITUDE_REAIS[magnitude] ?? 0;
+  const fiscalBase = analysis.impacto_fiscal.valor_anual_bi !== undefined
+    ? analysis.impacto_fiscal.valor_anual_bi * 1e9
+    : FISCAL_MAGNITUDE_REAIS[magnitude] ?? 0;
 
   let fiscalAnnual = 0;
   if (analysis.impacto_fiscal.tipo === 'custo') fiscalAnnual = -fiscalBase;
@@ -118,6 +128,7 @@ function buildActivePolicy(
     id,
     name,
     type: analysis.instrumento,
+    targetStates: analysis.estados_alvo,
     effects: analysis.indicadores,
     groupReactions: analysis.grupos,
     implementationMonths: analysis.implementationMonths ?? 0,
@@ -220,11 +231,18 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   // ============================================================
 
   runMonth() {
+    const prepared = get().prepareMonth();
+    if (prepared) get().commitPreparedMonth(prepared);
+  },
+
+  prepareMonth() {
     const { game, isRunningTurn } = get();
-    if (!game || isRunningTurn) return;
+    console.log('=== RUN MONTH', game?.month, '===');
+    console.log('activePolicies:', game?.activePolicies);
+    console.log('salario antes:', game?.nationalIndicators.salario_minimo);
 
-    set({ isRunningTurn: true, lastError: null });
-
+    if (!game || isRunningTurn) return null;
+    set({ lastError: null });
     try {
       // Snapshot do mês que está terminando (antes de rodar o turno)
       const snapshot = snapshotFromState(game);
@@ -236,9 +254,10 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         rawDeltas: { states: emptyStateDeltas(), national: {} },
       });
 
-      set({
+      return {
         game: {
           ...game,
+          year: result.year,
           month: result.month,
           stateIndicators: result.stateIndicators,
           nationalIndicators: result.nationalIndicators,
@@ -252,26 +271,33 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           policyHistory: result.policyHistory,
           history: newHistory,
         },
-        lastTurnLog: result.log,
-        lastTurnSummary: result.summary,
-        isRunningTurn: false,
-      });
-
-      // Persistência fire-and-forget
-      const next = get().game;
-      if (next && saveManager) {
-        void saveManager.persist(next).catch((err) => {
-          set({
-            lastError: err instanceof Error
-              ? `Falha ao salvar o histórico mensal: ${err.message}`
-              : 'Falha ao salvar o histórico mensal.',
-          });
-        });
-      }
+        log: result.log,
+        summary: result.summary,
+      };
     } catch (err) {
       set({
-        isRunningTurn: false,
         lastError: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  },
+
+  commitPreparedMonth(prepared) {
+    set({
+      game: prepared.game,
+      lastTurnLog: prepared.log,
+      lastTurnSummary: prepared.summary,
+      isRunningTurn: false,
+      lastError: null,
+    });
+
+    if (saveManager) {
+      void saveManager.persist(prepared.game).catch((err) => {
+        set({
+          lastError: err instanceof Error
+            ? `Falha ao salvar o histórico mensal: ${err.message}`
+            : 'Falha ao salvar o histórico mensal.',
+        });
       });
     }
   },
@@ -302,6 +328,17 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
       if (token.signal.aborted) return;
 
+      console.info('[policyAI] Análise validada', {
+        instrumento: result.analysis.instrumento,
+        indicadores: result.analysis.indicadores,
+        implementationMonths: result.analysis.implementationMonths ?? 0,
+        effectRampUpMonths: result.analysis.effectRampUpMonths ?? 0,
+        durationType: result.analysis.durationType ?? 'permanent',
+        durationMonths: result.analysis.durationMonths ?? 0,
+        warnings: result.metadata.attemptLog.flatMap((attempt) => attempt.warnings),
+        rejected: result.metadata.attemptLog.flatMap((attempt) => attempt.rejected),
+      });
+
       set({
         pendingProposal: {
           text,
@@ -330,25 +367,53 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     set({ isAnalyzing: false, pendingProposal: null });
   },
 
-  confirmProposal() {
+  confirmProposal(proposalInput) {
     const { game, pendingProposal } = get();
-    if (!game || !pendingProposal) return;
+    const proposal = proposalInput ?? pendingProposal;
+    if (!game || !proposal) {
+      console.error('[policy] Assinatura cancelada: jogo ou proposta indisponível.', {
+        hasGame: !!game,
+        hasPendingProposal: !!pendingProposal,
+        hasExplicitProposal: !!proposalInput,
+      });
+      return false;
+    }
 
     const id = newPolicyId();
-    const name = derivePolicyName(pendingProposal.text, pendingProposal.analysis);
-    const policy = buildActivePolicy(id, name, pendingProposal.analysis);
+    const name = ('name' in proposal && proposal.name) || derivePolicyName(proposal.text, proposal.analysis);
+    const policy = buildActivePolicy(id, name, proposal.analysis);
+    const nextGame: GameState = {
+      ...game,
+      activePolicies: [...game.activePolicies, policy],
+      policyHistory: [
+        ...game.policyHistory,
+        { monthIndex: monthIndex(game.year, game.month), id },
+      ],
+    };
 
     set({
-      game: {
-        ...game,
-        activePolicies: [...game.activePolicies, policy],
-        policyHistory: [
-          ...game.policyHistory,
-          { monthIndex: monthIndex(game.year, game.month), id },
-        ],
-      },
+      game: nextGame,
       pendingProposal: null,
     });
+
+    const signed = get().game?.activePolicies.some((active) => active.id === id) ?? false;
+    if (!signed) {
+      console.error('[policy] A medida não permaneceu no estado do jogo após a assinatura.', { id });
+      return false;
+    }
+    console.info('[policy] Medida assinada e adicionada ao jogo', {
+      id,
+      name,
+      instrument: policy.type,
+      effects: policy.effects,
+      implementationMonths: policy.implementationMonths,
+      effectRampUpMonths: policy.effectRampUpMonths,
+      durationType: policy.durationType,
+      durationMonths: policy.durationMonths,
+      activeMonths: policy.activeMonths,
+      activePolicyCount: get().game?.activePolicies.length ?? 0,
+    });
+    return true;
   },
 
   discardProposal() {

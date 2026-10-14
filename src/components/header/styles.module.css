@@ -66,6 +66,7 @@
 
 .monthInfo {
     display: flex;
+    gap: 12px;
     align-items: center;
 }
 
@@ -79,9 +80,35 @@
     border: 1px solid var(--border);
     border-radius: 999px;
     letter-spacing: 0.4px;
+    text-transform: capitalize;
     transition:
         background-color 0.15s ease,
         border-color 0.15s ease;
+}
+
+.exitButton {
+    flex: 0 0 auto;
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.exitButton:hover {
+    border-color: var(--accent);
+    background: var(--surface-raised, var(--surface));
+    color: var(--accent);
+}
+
+.exitButton:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
 }
 
 .monthInfo:hover .month {
@@ -158,6 +185,8 @@
         width: 100%;
         justify-content: space-between;
     }
+
+    .exitButton { margin-left: auto; }
 
     .navBar {
         gap: 4px;

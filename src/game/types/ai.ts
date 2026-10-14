@@ -18,6 +18,8 @@ export type FiscalMagnitude = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export interface ImpactoFiscal {
   tipo: FiscalType;
   magnitude: FiscalMagnitude;
+  /** Estimativa do impacto anual em R$ bilhões, quando a IA fornecer. */
+  valor_anual_bi?: number;
   nota: string;
 }
 
@@ -60,9 +62,14 @@ export interface AIInterpretation {
   efeitos_colaterais?: string[];
 
   // Metadados internos
+  // Metadados internos
   _elaboration_bonus?: boolean;
   _quality?: number;
   _fallback?: boolean;
+
+  /** Avisos gerados pelo sanitizador de deltas (ex.: valor ajustado
+   *  para o mínimo viável). Exibidos na UI junto da análise. */
+  warnings?: string[];
 }
 
 // ============================================================
@@ -192,6 +199,10 @@ export interface NationalContext {
   approvalTrend: 'subindo' | 'caindo' | 'estável';
   macro: IndicatorSnapshot[];
   fiscal: IndicatorSnapshot[];
+
+  /** Valores crus dos indicadores nacionais (id → valor).
+   *  Usado pelo prompt builder para a IA calcular deltas absolutos. */
+  indicators?: Record<string, number>;   // 👈 NOVO
 }
 
 export interface ProfileContext {
@@ -270,29 +281,265 @@ export interface ContextInput {
   history: ContextSnapshot[];
 }
 
-// ============================================================
-// OUTRAS TAREFAS (notícia, social, narrativa)
-// ============================================================
-// Contextos específicos serão redesenhados quando implementarmos cada tarefa.
-// Por ora só os formatos de saída:
 
-export interface NoticiaIA {
-  manchete: string;
-  corpo: string;
-  tom: 'positivo' | 'neutro' | 'negativo';
+// ============================================================
+// NOTÍCIAS
+// ============================================================
+
+import type { NewsTheme } from '../data/newsThemes';
+
+export type NewsTone = 'positivo' | 'neutro' | 'negativo';
+export type NewsImportance = 1 | 2 | 3;
+
+export interface NewsHighlight {
+  id: string;
+  label: string;
+  value: number;
+  delta?: number;
 }
 
-export interface PostIA {
+export type TriggerKind =
+  | 'shock3'
+  | 'reaction'
+  | 'crisis'
+  | 'trend'
+  | 'random'
+  | 'player_action';
+
+export interface NewsTrigger {
+  kind: TriggerKind;
+  tema: NewsTheme;
+  detalhe: string;
+  impacto: number;
+  refId?: string;
+}
+
+export interface Noticia {
+  id: string;
+  /** Mês do jogo em que a notícia foi publicada. */
+  mes: number;
+  manchete: string;
+  submanchete?: string;
+  corpo: string;
+  /** id de data/newsVehicles.ts */
+  veiculo: string;
+  tema: NewsTheme;
+  tom: NewsTone;
+  importancia: NewsImportance;
+  /** Caminho da imagem (asset). */
+  imagem: string;
+  destaques: NewsHighlight[];
+  gatilho: NewsTrigger;
+}
+
+// ============================================================
+// REDE SOCIAL
+// ============================================================
+
+export type PostTone = 'apoio' | 'critica' | 'neutro' | 'agressivo';
+
+export interface PostStatsData {
+  views: number;
+  likes: number;
+  reposts: number;
+}
+
+export interface Post {
+  id: string;
+  /** Mês do jogo (1-12). */
+  mes: number;
+  /** Dia do mês (1-28). */
+  dia: number;
+  /** Hora (0-23). */
+  hora: number;
+  /** Minuto (0-59). */
+  minuto: number;
+  /** id do perfil em data/socialProfiles.ts ou 'player'. */
   autorId: string;
   texto: string;
-  tom: 'apoio' | 'critica' | 'neutro';
+  tom: PostTone;
+  /** id do post original, se for resposta. */
+  respostaA?: string;
+  /** id da notícia em Noticia[], se estiver comentando uma. */
+  noticiaVinculada?: string;
+  /** Caminho de imagem opcional. */
+  midia?: string;
+  stats: PostStatsData;
+  geradoPor: 'ia' | 'jogador' | 'template';
 }
 
-export type PaginaIA =
-  | 'congresso'
-  | 'estado'
-  | 'jornal'
-  | 'rede-social'
-  | 'economia';
+// ============================================================
+// POSTS DO JOGADOR
+// ============================================================
 
-export type TarefaIA = 'medida' | 'noticia' | 'social' | 'narrativa';
+export type PlayerPostTone = 'oficial' | 'normal' | 'agressivo';
+
+export interface PlayerPost {
+  id: string;
+  mes: number;
+  dia: number;
+  hora: number;
+  minuto: number;
+  texto: string;
+  tom: PlayerPostTone;
+  /** id do post original, se for resposta. */
+  respostaA?: string;
+  stats: PostStatsData;
+  /** Preenchido no turno seguinte pela análise. */
+  analyzed?: PlayerPostAnalysis;
+}
+
+export interface PlayerPostAnalysis {
+  postId: string;
+  viralizou: boolean;
+  virouNoticia: boolean;
+  mancheteNoticia?: string;
+  /** Impacto na aprovação dos grupos (-5..+5). */
+  reacaoSocial: number;
+  /** Adição em scandalExposure (0..5). */
+  scandalAdd: number;
+  /** Respostas geradas por outros perfis. */
+  respostas: Array<{
+    perfilId: string;
+    texto: string;
+    tom: PostTone;
+  }>;
+}
+
+// ============================================================
+// RESULTADOS DE IA (rede)
+// ============================================================
+
+export interface SocialAIOptions {
+  model?: string;
+  temperatures?: number[];
+  maxAttempts?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  /** Quantos posts gerar (default: 20). */
+  count?: number;
+}
+
+export interface SocialAIMetadata {
+  attempts: number;
+  usedFallback: boolean;
+  totalDurationMs: number;
+  promptTokens: number;
+  responseTokens: number;
+}
+
+export interface SocialAIResult {
+  posts: Post[];
+  metadata: SocialAIMetadata;
+}
+
+// ============================================================
+// RESULTADOS DE IA (notícia)
+// ============================================================
+
+export interface NewsAIOptions {
+  model?: string;
+  temperatures?: number[];
+  maxAttempts?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  /** Quantas notícias gerar (2-4). */
+  count?: number;
+}
+
+export interface NewsAIMetadata {
+  attempts: number;
+  usedFallback: boolean;
+  totalDurationMs: number;
+  promptTokens: number;
+  responseTokens: number;
+}
+
+export interface NewsAIResult {
+  noticias: Noticia[];
+  metadata: NewsAIMetadata;
+}
+
+// ============================================================
+// RESULTADO DE IA (análise de post do jogador)
+// ============================================================
+
+export interface PlayerPostAIOptions {
+  model?: string;
+  temperatures?: number[];
+  maxAttempts?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+export interface PlayerPostAIMetadata {
+  attempts: number;
+  usedFallback: boolean;
+  totalDurationMs: number;
+  promptTokens: number;
+  responseTokens: number;
+}
+
+export interface PlayerPostAIResult {
+  analyses: PlayerPostAnalysis[];
+  metadata: PlayerPostAIMetadata;
+}
+
+// ============================================================
+// INPUT DOS MOTORES
+// ============================================================
+
+export interface NewsContextInput {
+  game: GameStateForNews;
+  history: ContextSnapshot[];
+  lastTurnLog: unknown;   // TurnLog — evita import circular
+  lastTurnSummary: unknown;
+}
+
+/**
+ * Subset do GameState que a IA de notícia precisa.
+ * Evita import circular do initialState.ts.
+ */
+export interface GameStateForNews {
+  year: number;
+  month: number;
+  macros: Record<string, number>;
+  nationalIndicators: Record<string, number>;
+  groupApprovals: Record<string, number>;
+  stateApprovals: Record<string, number>;
+  nationalApproval: number;
+  activePolicies: Array<{
+    id: string;
+    name: string;
+    type: string;
+    activeMonths: number;
+    fiscalAnnual: number;
+    effects: Record<string, number | undefined>;
+  }>;
+  activeReactions: Array<{
+    groupId: string;
+    monthsActive: number;
+  }>;
+}
+
+export interface SocialContextInput {
+  year: number;
+  month: number;
+  game: GameStateForNews;
+  noticias: Noticia[];
+  playerPostsFromLastTurn: PlayerPost[];
+  profileSeed?: {
+    playerName: string;
+    playerHandle: string;
+    seguidores: number;
+  };
+}
+
+export interface PlayerPostContextInput {
+  year: number;
+  month: number;
+  playerPosts: PlayerPost[];
+  noticias: Noticia[];
+  recentPosts: Post[];
+  game: GameStateForNews;
+}
