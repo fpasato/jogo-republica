@@ -1,0 +1,143 @@
+/* ============================================================
+   BACKDROP
+   ============================================================ */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--overlay-backdrop);
+  backdrop-filter: blur(6px);
+  animation: backdropIn 0.15s ease;
+}
+
+/* ============================================================
+   DIÁLOGO
+   ============================================================ */
+
+.dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: min(90vh, 920px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 0 var(--accent-glow) inset,
+    0 24px 64px rgba(2, 6, 15, 0.65);
+  overflow: hidden;
+  outline: none;
+  animation: dialogIn 0.2s ease;
+}
+
+.sm { max-width: 440px; }
+.md { max-width: 620px; }
+.lg { max-width: 880px; }
+.xl { max-width: 1100px; }
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+
+/* ============================================================
+   BODY
+   ============================================================ */
+
+.body {
+  flex: 1 1 auto;
+  padding: 22px;
+  overflow-y: auto;
+  color: var(--text);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-hover) transparent;
+}
+
+.body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.body::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 8px;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 16px 22px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+
+/* ============================================================
+   ANIMAÇÕES
+   ============================================================ */
+
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ============================================================
+   RESPONSIVO
+   ============================================================ */
+
+@media (max-width: 560px) {
+  .backdrop { padding: 12px; }
+
+  .header,
+  .body,
+  .footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .title {
+    font-size: 0.95rem;
+  }
+}

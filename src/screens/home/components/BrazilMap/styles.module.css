@@ -1,0 +1,285 @@
+/* =========================================================
+   BrazilMap — UI de jogo (dark, alto contraste)
+   ========================================================= */
+
+.wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 3 / 2;
+  margin: 0 auto;
+  padding: 22px;
+  border-radius: 14px;
+  overflow: hidden;
+  isolation: isolate;
+
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(2, 6, 15, 0.4);
+}
+
+/* Halo pulsante ao redor do mapa */
+.glow {
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--accent-glow),
+    transparent 60%
+  );
+  filter: blur(48px);
+  animation: pulseGlow 8s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5;  transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.02); }
+}
+
+/* Grade sutil por baixo do mapa */
+.wrapper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--accent-glow) 1px, transparent 1px),
+    linear-gradient(90deg, var(--accent-glow) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(circle at 50% 50%, #000 40%, transparent 85%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 40%, transparent 85%);
+  opacity: 0.6;
+  z-index: 0;
+}
+
+.svg {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* ---------- Estados do mapa ---------- */
+
+.path {
+  cursor: pointer;
+  stroke: var(--bg);
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+  transition:
+    fill 220ms ease,
+    stroke 180ms ease,
+    stroke-width 180ms ease,
+    filter 180ms ease;
+  outline: none;
+}
+
+/* Estados sem dado cadastrado */
+.path[data-empty='true'] {
+  fill: var(--surface-2);
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Hover */
+.hovered {
+  stroke: var(--text);
+  stroke-width: 1.6;
+  filter:
+    brightness(1.2)
+    drop-shadow(0 0 6px var(--focus-ring));
+}
+
+/* Selecionado */
+.selected {
+  stroke: var(--amber);
+  stroke-width: 2.2;
+  filter:
+    brightness(1.12)
+    drop-shadow(0 0 6px var(--amber))
+    drop-shadow(0 0 14px rgba(251, 191, 36, 0.45));
+}
+
+/* Selecionado + hover */
+.selected.hovered {
+  stroke: var(--text);
+  stroke-width: 2.5;
+  filter:
+    brightness(1.3)
+    drop-shadow(0 0 8px var(--amber))
+    drop-shadow(0 0 18px rgba(251, 191, 36, 0.6));
+}
+
+/* ---------- Legenda ---------- */
+
+.legend {
+  position: absolute;
+  left: 22px;
+  bottom: 22px;
+  z-index: 5;
+
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+
+  padding: 8px 10px;
+  border-radius: 10px;
+
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 18px rgba(2, 6, 15, 0.55);
+  pointer-events: none;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.legendSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.legendLabel {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Valor de aprovação em destaque no tooltip */
+.approvalValue {
+  font-weight: 700;
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* ---------- Tooltip ---------- */
+
+.tooltip {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+
+  padding: 10px 12px;
+  border-radius: 10px;
+
+  background: var(--surface-3);
+  border: 1px solid var(--border-hover);
+  box-shadow:
+    0 12px 28px rgba(2, 6, 15, 0.65),
+    0 0 0 1px var(--accent-glow) inset,
+    0 0 18px var(--accent-glow);
+
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+
+  animation: tooltipIn 120ms ease-out;
+  will-change: transform, opacity;
+}
+
+@keyframes tooltipIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Setinha lateral */
+.tooltip::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 14px;
+  width: 10px;
+  height: 10px;
+  background: var(--surface-3);
+  border-left: 1px solid var(--border-hover);
+  border-bottom: 1px solid var(--border-hover);
+  transform: rotate(45deg);
+}
+
+.tooltip strong {
+  display: block;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow);
+
+  border-bottom: 1px solid var(--border);
+}
+
+.tooltip div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 0;
+  color: var(--text-muted);
+}
+
+.tooltip div span:last-child {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- Responsivo ---------- */
+
+@media (max-width: 720px) {
+  .wrapper {
+    aspect-ratio: 4 / 3;
+    padding: 16px;
+  }
+
+  .legend {
+    left: 16px;
+    bottom: 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  .wrapper {
+    aspect-ratio: 1 / 1;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .tooltip {
+    font-size: 0.72rem;
+    padding: 8px 10px;
+  }
+
+  .legend {
+    left: 16px;
+    bottom: 16px;
+    grid-template-columns: 1fr;
+    gap: 3px;
+    padding: 7px 9px;
+  }
+
+  .legendItem {
+    font-size: 0.58rem;
+  }
+}
+
+/* ---------- Acessibilidade ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .glow { animation: none; }
+  .path { transition: none; }
+  .tooltip { animation: none; }
+}

@@ -1,0 +1,170 @@
+/* styles.module.css */
+
+.header {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 24px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(2, 6, 15, 0.4);
+}
+
+/* ---------- Topo ---------- */
+
+.headertop {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.logoContainer {
+    width: 106px;
+    transition: border-color 0.15s ease;
+}
+
+.logo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 6px;
+}
+
+.headerInfo {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.presidentInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-left: 12px;
+    border-left: 2px solid var(--accent);
+}
+
+.name {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.2px;
+}
+
+.party {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+}
+
+.monthInfo {
+    display: flex;
+    align-items: center;
+}
+
+.month {
+    margin: 0;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    letter-spacing: 0.4px;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.monthInfo:hover .month {
+    background: var(--surface);
+    border-color: var(--border-hover);
+}
+
+/* ---------- Navegação ---------- */
+
+.navBar {
+    display: flex;
+    gap: 6px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.navBar a {
+    position: relative;
+    padding: 8px 14px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-radius: 8px;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.navBar a:hover {
+    color: var(--accent);
+    background: var(--surface);
+}
+
+.navBar a:focus-visible {
+    outline: none;
+    color: var(--text);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.navBar a[aria-current='page'],
+.navBar a.active {
+    color: var(--on-accent);
+    background: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 0 12px var(--accent-glow);
+}
+
+.navBar a[aria-current='page']:hover,
+.navBar a.active:hover {
+    background: var(--accent-hover);
+}
+
+.navBar a:active {
+    background: var(--accent-pressed);
+    color: var(--on-accent);
+}
+
+/* ---------- Responsivo ---------- */
+
+@media (max-width: 560px) {
+    .header {
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .headertop {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .headerInfo {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .navBar {
+        gap: 4px;
+    }
+
+    .navBar a {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+}

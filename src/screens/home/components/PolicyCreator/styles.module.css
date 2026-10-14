@@ -1,0 +1,458 @@
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+
+.policyCreator {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(2, 6, 15, 0.4);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+
+.badge {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  letter-spacing: 0.4px;
+}
+
+/* ============================================================
+   CONTADOR DE TENTATIVAS
+   ============================================================ */
+
+.counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.counter[data-level='ok'] {
+  border-color: var(--border-hover);
+}
+
+.counter[data-level='warning'] {
+  border-color: var(--warning);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.counter[data-level='danger'] {
+  border-color: var(--danger);
+  background: rgba(251, 113, 133, 0.1);
+}
+
+.counterDots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.counterDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--surface-3, var(--surface-2));
+  border: 1px solid var(--border-hover);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.counterDot[data-filled='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.counter[data-level='warning'] .counterDot[data-filled='true'] {
+  background: var(--warning);
+  border-color: var(--warning);
+}
+
+.counter[data-level='danger'] .counterDot[data-filled='true'] {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.counterText {
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+}
+
+.counter[data-level='warning'] .counterText {
+  color: var(--warning);
+}
+
+.counter[data-level='danger'] .counterText {
+  color: var(--danger);
+}
+
+/* ============================================================
+   CAMPOS
+   ============================================================ */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.2px;
+}
+
+.field label span {
+  font-weight: 400;
+  color: var(--text-subtle);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  resize: vertical;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--text-subtle);
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.field input:disabled,
+.field textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================================
+   BOTÕES
+   ============================================================ */
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.primary,
+.ghost,
+.danger,
+.confirm {
+  padding: 9px 16px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.primary,
+.confirm {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+.primary:hover:not(:disabled),
+.confirm:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.primary:active:not(:disabled),
+.confirm:active:not(:disabled) {
+  background: var(--accent-pressed);
+}
+
+.ghost {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: var(--border);
+}
+
+.ghost:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-hover);
+  background: var(--surface-2);
+}
+
+.danger {
+  color: var(--danger);
+  background: transparent;
+  border-color: rgba(251, 113, 133, 0.3);
+}
+
+.danger:hover:not(:disabled) {
+  background: rgba(251, 113, 133, 0.1);
+  border-color: var(--danger);
+}
+
+.primary:focus-visible,
+.ghost:focus-visible,
+.danger:focus-visible,
+.confirm:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.primary:disabled,
+.ghost:disabled,
+.danger:disabled,
+.confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.footerStart {
+  margin-right: auto;
+}
+
+/* ============================================================
+   TEXTOS
+   ============================================================ */
+
+.error {
+  padding: 10px 12px;
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--danger);
+  background: rgba(251, 113, 133, 0.08);
+  border: 1px solid rgba(251, 113, 133, 0.25);
+  border-radius: 8px;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.resumo {
+  margin: 0 0 16px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.positive {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.negative {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.legal {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-left: 3px solid var(--info);
+  border-radius: 6px;
+}
+
+/* ============================================================
+   BLOCO DE ANÁLISE
+   ============================================================ */
+
+.analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.analysis p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+
+.tagPrimary {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.analysisGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.analysisGrid h4 {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* ============================================================
+   LISTAS DE EFEITOS
+   ============================================================ */
+
+.effectList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.effectList li {
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* ============================================================
+   INSTRUMENTO
+   ============================================================ */
+
+.instrument {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  margin: 16px 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+}
+
+.instrumentLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.instrumentName {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+/* ============================================================
+   TÍTULOS INTERNOS DO MODAL
+   ============================================================ */
+
+h4 {
+  margin: 18px 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+
+/* ============================================================
+   RESPONSIVO
+   ============================================================ */
+
+@media (max-width: 560px) {
+  .panel {
+    padding: 16px;
+  }
+
+  .panelHeader {
+    align-items: flex-start;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+  }
+
+  .actions > button {
+    width: 100%;
+  }
+}

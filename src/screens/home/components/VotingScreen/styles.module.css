@@ -1,0 +1,349 @@
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px);
+}
+
+.modal {
+    width: min(780px, 100%);
+    max-height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+    border-radius: 12px;
+    background: #1b1f27;
+    color: #e8eaed;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Cabeçalho ---------- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.eyebrow {
+    margin: 0 0 4px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9aa0a6;
+}
+
+.title {
+    margin: 0;
+    font-size: 20px;
+}
+
+.skip {
+    padding: 6px 12px;
+    border: 1px solid #3c4350;
+    border-radius: 6px;
+    background: transparent;
+    color: #c4c7cc;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.skip:hover {
+    background: #262b35;
+}
+
+/* ---------- Etapas ---------- */
+.steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border: 1px solid #3c4350;
+    border-radius: 999px;
+    font-size: 13px;
+    color: #9aa0a6;
+}
+
+.step[data-status='active'] {
+    border-color: #8ab4f8;
+    color: #e8eaed;
+}
+
+.step[data-status='approved'] {
+    border-color: #2e9e5b;
+    color: #7ddc9f;
+}
+
+.step[data-status='rejected'] {
+    border-color: #d64545;
+    color: #f29a9a;
+}
+
+.stepMark {
+    font-weight: 700;
+}
+
+/* ---------- Casa ---------- */
+.chamber {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.chamberHead {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.chamberHead h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.rule {
+    font-size: 12px;
+    color: #9aa0a6;
+}
+
+/* ---------- Quadrados ---------- */
+.squares {
+    --size: 16px;
+    --gap: 3px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap);
+    justify-content: center;
+}
+
+.squares[data-stage='senado'] {
+    --size: 28px;
+    --gap: 5px;
+}
+
+.squares[data-stage='stf'] {
+    --size: 44px;
+    --gap: 8px;
+}
+
+.square {
+    width: var(--size);
+    height: var(--size);
+    border-radius: 3px;
+    background: #2b303b;
+    transition: background-color 0.25s ease, transform 0.25s ease;
+}
+
+.square[data-vote='sim'] {
+    background: #2e9e5b;
+    animation: pop 0.25s ease;
+}
+
+.square[data-vote='nao'] {
+    background: #d64545;
+    animation: pop 0.25s ease;
+}
+
+.square[data-vote='abstencao'] {
+    background: #e8b923;
+    animation: pop 0.25s ease;
+}
+
+/* Enquanto a casa está votando, os quadrados que faltam pulsam */
+.squares[data-voting='true'] .square[data-vote='pending'] {
+    animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        background: #2b303b;
+    }
+    50% {
+        background: #3a4150;
+    }
+}
+
+/* Cores dos números (placar e resumo) */
+.yes {
+    color: #4fd48a;
+}
+
+.no {
+    color: #f07a7a;
+}
+
+.abstain {
+    color: #f2c94c;
+}
+
+/* Resumo final por casa */
+.resultText {
+    flex: 1;
+    min-width: 260px;
+}
+
+.summary {
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+}
+
+.summary li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.summaryName {
+    font-weight: 600;
+}
+
+.summary li[data-approved='true'] .summaryName {
+    color: #7ddc9f;
+}
+
+.summary li[data-approved='false'] .summaryName {
+    color: #f29a9a;
+}
+
+.summaryCounts {
+    color: #c4c7cc;
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes pop {
+    from {
+        transform: scale(0.4);
+    }
+    to {
+        transform: scale(1);
+    }
+}
+
+/* ---------- Placar ---------- */
+.tally {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.tallyItem {
+    min-width: 96px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #232831;
+    text-align: center;
+    border-top: 3px solid transparent;
+}
+
+.tallyItem span {
+    display: block;
+    font-size: 12px;
+    color: #9aa0a6;
+}
+
+.tallyItem strong {
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+}
+
+.tallyItem[data-vote='sim'] {
+    border-top-color: #2e9e5b;
+}
+
+.tallyItem[data-vote='nao'] {
+    border-top-color: #d64545;
+}
+
+.tallyItem[data-vote='abstencao'] {
+    border-top-color: #e8b923;
+}
+
+/* ---------- Resultado ---------- */
+.result {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 16px;
+    border-radius: 10px;
+    border-left: 4px solid #3c4350;
+    background: #232831;
+}
+
+.result[data-result='approved'] {
+    border-left-color: #2e9e5b;
+}
+
+.result[data-result='rejected'] {
+    border-left-color: #d64545;
+}
+
+.result h3 {
+    margin: 0 0 4px;
+    font-size: 17px;
+}
+
+.muted {
+    margin: 0;
+    font-size: 13px;
+    color: #9aa0a6;
+}
+
+.continue {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    background: #8ab4f8;
+    color: #10151c;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.continue:hover {
+    background: #a3c4fa;
+}
+
+@media (max-width: 520px) {
+    .modal {
+        padding: 16px;
+    }
+
+    .squares {
+        --size: 12px;
+        --gap: 2px;
+    }
+
+    .squares[data-stage='senado'] {
+        --size: 22px;
+    }
+
+    .squares[data-stage='stf'] {
+        --size: 34px;
+    }
+}

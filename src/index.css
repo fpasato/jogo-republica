@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Familjen+Grotesk:ital,wght@0,400..700;1,400..700&family=Momo+Trust+Sans:wght@200..800&family=Urbanist:ital,wght@0,100..900;1,100..900&family=Ysabeau:ital,wght@0,1..1000;1,1..1000&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Urbanist", sans-serif;
+}
+
+
+:root {
+  /* Fundos */
+  --bg: #020406;
+  --surface: #101621;
+
+  /* Bordas */
+  --border: #293A52;
+  --border-hover: #405775;
+
+  /* Textos */
+  --text: #F0F5FF;
+  --text-muted: #9AAAC4;
+  --text-subtle: #71839F;
+
+  /* Cor principal */
+  --accent: #10B981;
+  --accent-hover: #34D399;
+  --accent-pressed: #059669;
+  --on-accent: #03251B;
+
+  /* Cores complementares */
+  --blue: #38BDF8;
+  --blue-hover: #7DD3FC;
+  --purple: #A78BFA;
+  --purple-hover: #C4B5FD;
+  --amber: #FBBF24;
+  --coral: #FB7185;
+
+  /* Estados */
+  --success: #34D399;
+  --warning: #FBBF24;
+  --danger: #FB7185;
+  --info: #38BDF8;
+
+  /* Foco e interação */
+  --focus-ring: rgba(56, 189, 248, 0.45);
+  --accent-glow: rgba(16, 185, 129, 0.12);
+  --overlay-backdrop: rgba(2, 6, 15, 0.72);
+
+  /* Gráficos */
+  --chart-1: #10B981;
+  --chart-2: #38BDF8;
+  --chart-3: #A78BFA;
+  --chart-4: #FBBF24;
+  --chart-5: #FB7185;
+}
