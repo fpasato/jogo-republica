@@ -1,80 +1,65 @@
-import type { Noticia, Post } from '../../../../game/types/ai';
-import placeholderImage from '../../../../game/assets/news/_placeholder.png';
+import { useGameStore } from '../../../../store/gameStore';
+import { GROUPS } from '../../../../game/data/groups';
 import styles from './styles.module.css';
 
-interface NewsHomeProps {
-  noticias: Noticia[];
-  posts?: Post[];
-  isLoading?: boolean;
-  error?: string | null;
-}
+export function NewsHome() {
+  const media = useGameStore(s => s.lastMedia);
+  const game = useGameStore(s => s.game);
 
-const TONE_LABEL = {
-  positivo: 'Positiva',
-  neutro: 'Neutra',
-  negativo: 'Negativa',
-} as const;
+  if (!game) return null;
+  if (!media) return <p className={styles.empty}>Avance o mês para gerar notícias.</p>;
 
-export function NewsHome({ noticias, posts = [], isLoading = false, error }: NewsHomeProps) {
   return (
-    <section className={styles.container} aria-labelledby="news-home-title">
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>Acompanhe o país</p>
-          <h2 id="news-home-title">Jornal e redes</h2>
-        </div>
-        {isLoading && <span className={styles.status}>Atualizando…</span>}
-      </header>
-
-      {error && <p className={styles.error} role="alert">{error}</p>}
-
-      {noticias.length === 0 ? (
-        <p className={styles.empty}>
-          {isLoading ? 'As notícias do mês estão sendo preparadas.' : 'As notícias do próximo mês aparecerão aqui.'}
-        </p>
-      ) : (
-        <div className={styles.newsList}>
-          {noticias.map((noticia) => (
-            <article className={styles.article} key={noticia.id}>
-              <img
-                className={styles.image}
-                src={noticia.imagem || placeholderImage}
-                alt=""
-                loading="lazy"
-                onError={(event) => {
-                  if (event.currentTarget.dataset.fallback !== 'true') {
-                    event.currentTarget.dataset.fallback = 'true';
-                    event.currentTarget.src = placeholderImage;
-                  }
-                }}
-              />
-              <div className={styles.articleBody}>
-                <div className={styles.meta}>
-                  <span>{noticia.veiculo.replaceAll('_', ' ')}</span>
-                  <span data-tone={noticia.tom}>{TONE_LABEL[noticia.tom]}</span>
-                </div>
-                <h3>{noticia.manchete}</h3>
-                {noticia.submanchete && <p className={styles.subtitle}>{noticia.submanchete}</p>}
-                <p className={styles.body}>{noticia.corpo}</p>
-              </div>
+    <div className={styles.wrapper}>
+      <section>
+        <h3>Notícias</h3>
+        <div className={styles.newsGrid}>
+          {media.news.map(n => (
+            <article key={n.id} className={`${styles.news} ${styles[n.tone]}`}>
+              <header>
+                <span className={styles.source}>{n.source}</span>
+                <span className={styles.category}>{n.category}</span>
+              </header>
+              <h4>{n.title}</h4>
+              <p>{n.body}</p>
             </article>
           ))}
         </div>
-      )}
+      </section>
 
-      {posts.length > 0 && (
-        <section className={styles.social} aria-labelledby="social-feed-title">
-          <h3 id="social-feed-title">Repercussão nas redes</h3>
-          {posts.slice(0, 6).map((post) => (
-            <article className={styles.post} key={post.id}>
-              <p>{post.texto}</p>
-              <span>{post.stats.likes.toLocaleString('pt-BR')} curtidas · {post.stats.reposts.toLocaleString('pt-BR')} compartilhamentos</span>
+      <section>
+        <h3>Redes sociais</h3>
+        <div className={styles.posts}>
+          {media.posts.map(p => (
+            <article key={p.id} className={styles.post}>
+              <header>
+                <strong>{p.authorName}</strong>
+                <span className={styles.handle}>{p.handle}</span>
+                <span className={styles.groupTag}>{GROUPS[p.authorGroup].name}</span>
+              </header>
+              <p>{p.text}</p>
+              <footer>
+                <span>♥ {p.likes}</span>
+                <span>↻ {p.reposts}</span>
+                <span>💬 {p.replies}</span>
+              </footer>
             </article>
           ))}
-        </section>
-      )}
-    </section>
+        </div>
+      </section>
+
+      <section>
+        <h3>Reações dos grupos</h3>
+        <ul className={styles.reactions}>
+          {media.reactions.map((r, i) => (
+            <li key={i} className={r.intensity > 0 ? styles.positive : r.intensity < 0 ? styles.negative : ''}>
+              <strong>{GROUPS[r.groupId].name}</strong>
+              <h5>{r.headline}</h5>
+              <p>{r.summary}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
   );
 }
-
-export default NewsHome;

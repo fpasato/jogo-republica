@@ -10,47 +10,63 @@
 
 :root {
   /* Fundos */
-  --bg: #020406;
-  --surface: #101621;
+  --bg: #090A0B;
+  --surface: #121415;
+  --surface-hover: #1B1D1E;
+  --surface-elevated: #202223;
+  --surface-overlay: #181A1B;
 
   /* Bordas */
-  --border: #293A52;
-  --border-hover: #405775;
+  --border: #2B2E2D;
+  --border-hover: #424743;
+  --border-subtle: #202322;
 
   /* Textos */
-  --text: #F0F5FF;
-  --text-muted: #9AAAC4;
-  --text-subtle: #71839F;
+  --text: #F2F2EE;
+  --text-muted: #A3A69F;
+  --text-subtle: #737870;
+  --text-disabled: #50544F;
 
-  /* Cor principal */
-  --accent: #10B981;
-  --accent-hover: #34D399;
-  --accent-pressed: #059669;
-  --on-accent: #03251B;
+  /* Cor principal — Verde esmeralda */
+  --accent: #22C55E;
+  --accent-hover: #4ADE80;
+  --accent-pressed: #16A34A;
+  --on-accent: #071B0D;
 
   /* Cores complementares */
-  --blue: #38BDF8;
-  --blue-hover: #7DD3FC;
-  --purple: #A78BFA;
-  --purple-hover: #C4B5FD;
-  --amber: #FBBF24;
-  --coral: #FB7185;
+  --green: #22C55E;
+  --green-hover: #4ADE80;
+
+  --purple: #B39AFB;
+  --purple-hover: #C8B8FF;
+
+  --amber: #F4B942;
+  --amber-hover: #FFD16A;
+
+  --coral: #F07878;
+  --coral-hover: #FF9494;
+
+  --olive: #A3A65C;
+  --stone: #B5AAA0;
 
   /* Estados */
-  --success: #34D399;
-  --warning: #FBBF24;
-  --danger: #FB7185;
-  --info: #38BDF8;
+  --success: #4ADE80;
+  --warning: #F4B942;
+  --danger: #F07878;
+  --info: #B39AFB;
 
   /* Foco e interação */
-  --focus-ring: rgba(56, 189, 248, 0.45);
-  --accent-glow: rgba(16, 185, 129, 0.12);
-  --overlay-backdrop: rgba(2, 6, 15, 0.72);
+  --focus-ring: rgba(34, 197, 94, 0.42);
+  --accent-glow: rgba(34, 197, 94, 0.10);
+  --overlay-backdrop: rgba(0, 0, 0, 0.76);
 
   /* Gráficos */
-  --chart-1: #10B981;
-  --chart-2: #38BDF8;
-  --chart-3: #A78BFA;
-  --chart-4: #FBBF24;
-  --chart-5: #FB7185;
+  --chart-1: #22C55E;
+  --chart-2: #B39AFB;
+  --chart-3: #F4B942;
+  --chart-4: #F07878;
+  --chart-5: #A3A65C;
+  --chart-6: #D4D4CE;
+  --chart-7: #C084FC;
+  --chart-8: #E5A17A;
 }

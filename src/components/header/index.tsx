@@ -4,9 +4,11 @@ import logo from '../../assets/logo.png';
 
 interface HeaderProps {
     onBackToMenu?: () => void;
+    activePage?: string;
+    onNavigate?: (page: string) => void;
 }
 
-export function Header({ onBackToMenu }: HeaderProps) {
+export function Header({ onBackToMenu, activePage, onNavigate }: HeaderProps) {
     const game = useGameStore((state) => state.game);
     const reset = useGameStore((state) => state.reset);
     const monthLabel = game
@@ -46,10 +48,7 @@ export function Header({ onBackToMenu }: HeaderProps) {
             </div>
 
             <div className={styles.navBar}>
-                <a href="#">Dashboard</a>
-                <a href="#">Economia</a>
-                <a href="#">Política</a>
-                <a href="#">Social</a>
+                {[["dashboard", "Dashboard"], ["pais", "País"], ["economia", "Economia"], ["saude", "Saúde"], ["educacao", "Educação"], ["seguranca", "Segurança"], ["emprego", "Emprego"], ["social", "Assistência social"], ["infraestrutura", "Infraestrutura"], ["ambiente", "Meio ambiente e energia"], ["gestao", "Administração"]].map(([id, label]) => <a key={id} href={`#${id}`} aria-current={activePage === id ? 'page' : undefined} onClick={(event) => { if (onNavigate) { event.preventDefault(); onNavigate(id); } }}>{label}</a>)}
             </div>
         </header>
     );

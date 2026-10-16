@@ -347,3 +347,26 @@
         --size: 34px;
     }
 }
+
+/* Tela de votação integrada ao modelo atual de propostas */
+.empty,.wrapper { padding: 1rem clamp(.8rem, 2vw, 1.5rem); color: var(--text); }
+.wrapper { display: grid; gap: .8rem; }
+.policy,.negotiation,.outcome { padding: .85rem; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.policy h3,.negotiation h4,.outcome h3 { margin: 0 0 .35rem; }
+.policy p { margin: .3rem 0; font-size: .78rem; line-height: 1.4; }
+.tag { color: var(--text-muted); font-size: .7rem!important; }
+.policy h4 { margin: .6rem 0 .25rem; font-size: .75rem; }
+.policy ul { display: flex; flex-wrap: wrap; gap: .3rem; margin: 0; padding: 0; list-style: none; }
+.policy li,.policyParameters span { padding: .18rem .38rem; border-radius: 5px; background: color-mix(in srgb, var(--text) 5%, var(--surface)); font-size: .68rem; }
+.policyParameters { display: grid; gap: .2rem; }
+.muted { color: var(--text-muted); font-size: .7rem; }
+.negotiation { display: grid; gap: .55rem; }
+.negotiation select { width: 100%; max-width: 28rem; padding: .4rem; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--surface-2); }
+.offers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .45rem; }
+.offers button { display: grid; gap: .2rem; text-align: left; padding: .55rem; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--surface-2); cursor: pointer; }
+.offers button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.offers small,.offers span { color: var(--text-muted); font-size: .65rem; line-height: 1.35; }
+.submit { justify-self: end; padding: .45rem .75rem; border: 1px solid var(--accent); border-radius: 7px; color: var(--on-accent); background: var(--accent); font: inherit; font-size: .75rem; font-weight: 650; cursor: pointer; }
+.outcome { overflow-x: auto; }
+.outcome table { width: 100%; border-collapse: collapse; font-size: .72rem; }
+.outcome th,.outcome td { padding: .4rem; border-bottom: 1px solid var(--border); text-align: left; }

@@ -1,32 +1,30 @@
 import { create } from 'zustand';
+import type { GameState } from '../game/types/game';
+import type { SliderId } from '../game/types/game';
+import { SLIDERS } from '../game/data/sliders';
+import type { PolicyMeasure } from '../game/types/policy';
+import type { TurnMedia } from '../game/services/templates/types';
+import type { VotingOutcome } from '../game/services/parliament/votingService';
+
+import { createInitialState } from '../game/services/engine/initialState';
+import { advanceTurn, activatePolicy } from '../game/services/engine/turn';
+
+import { interpretMeasure } from '../game/services/ai/measureAI';
 import {
-  buildInitialState,
-  snapshotFromState,
-  type GameState,
-} from '../game/services/engine/initialState';
+  runPolicyVoting,
+  projectPolicyVoting,
+  applyDilution,
+} from '../game/services/engine/votingIntegration';
+import { resolveOffers } from '../game/services/parliament/negotiationService';
+
 import {
-  runGameTurn,
-  type TurnLog,
-  type TurnSummary,
-} from '../game/services/engine/turn';
-import {
-  analyzePolicy,
-  createCancellationToken,
-  type PolicyAIOptions,
-  type PolicyAIMetadata,
-} from '../game/services/ai/policyAI';
-import { FISCAL_MAGNITUDE_REAIS } from '../game/data/catalog';
-import type {
-  AIInterpretation,
-  ContextInput,
-  ProfileContext,
-  PlayerProfile,
-} from '../game/types/ai';
-import type { ActivePolicy } from '../game/types/policy';
-import { SaveManager, createSave, loadSave } from '../game/services/persistence/db';
-import { profileToContext } from '../game/services/politics/profileService';
-import { STATE_IDS, type StateId } from '../game/data/states';
-import { monthIndex } from '../game/services/engine/approval';
+  createSave,
+  loadSave,
+  updateSave,
+  listSaves,
+  deleteSave,
+  type SaveGame,
+} from '../game/services/persistence/db';
 
 // ============================================================
 // TIPOS
@@ -35,18 +33,13 @@ import { monthIndex } from '../game/services/engine/approval';
 export interface PendingProposal {
   /** Texto que o jogador digitou. */
   text: string;
-  /** Análise retornada pela IA. */
-  analysis: AIInterpretation;
-  /** Metadados (tentativas, duração, tokens, fallback?). */
-  metadata: PolicyAIMetadata;
-  /** Timestamp local da criação (não é mês de jogo). */
+  /** Medida já validada, pronta para virar política. */
+  policy: PolicyMeasure;
+  /** Erros/avisos da IA. */
+  errors: string[];
+  warnings: string[];
+  /** Timestamp local. */
   createdAt: number;
-}
-
-export interface PreparedMonth {
-  game: GameState;
-  log: TurnLog;
-  summary: TurnSummary;
 }
 
 export interface GameStoreState {
@@ -54,12 +47,15 @@ export interface GameStoreState {
   game: GameState | null;
   saveId: number | null;
 
-  // ---------- Proposta em análise ----------
+  // ---------- Proposta em revisão ----------
   pendingProposal: PendingProposal | null;
 
-  // ---------- Resultado do último turno (para UI/notícias) ----------
-  lastTurnLog: TurnLog | null;
-  lastTurnSummary: TurnSummary | null;
+  // ---------- Negociação + votação ----------
+  negotiation: Record<string, string[]>;
+  votingOutcome: VotingOutcome | null;
+
+  // ---------- Mídia do último turno ----------
+  lastMedia: TurnMedia | null;
 
   // ---------- Flags ----------
   isAnalyzing: boolean;
@@ -67,84 +63,42 @@ export interface GameStoreState {
   lastError: string | null;
 
   // ---------- Ciclo de vida ----------
-  newGame(profile?: ProfileContext, name?: string): Promise<void>;
-  createNewGame(profile: PlayerProfile, name?: string): Promise<void>;
+  newGame(name?: string, partyId?: string): Promise<void>;
   loadGame(saveId: number): Promise<void>;
+  listSaves(): Promise<SaveGame[]>;
+  deleteSave(saveId: number): Promise<void>;
   reset(): void;
   hydrate(state: GameState, saveId: number): void;
-  exportState(): GameState | null;
+
+  // ---------- Sliders ----------
+  setSlider(id: keyof GameState['sliders'], value: number): void;
+  saveSlider(id: SliderId, value: number): boolean;
+
+  // ---------- Proposta ----------
+  analyzeProposal(text: string): Promise<void>;
+  discardProposal(): void;
+  confirmProposal(): boolean;
+
+  // ---------- Negociação ----------
+  setOffer(partyId: string, offerId: string, enable: boolean): void;
+  clearOffers(): void;
+  projectVoting(): Promise<void>;
+
+  // ---------- Votação ----------
+  submitToVoting(playerPartyId?: string | null): Promise<void>;
 
   // ---------- Turno ----------
   runMonth(): void;
-  prepareMonth(): PreparedMonth | null;
-  commitPreparedMonth(prepared: PreparedMonth): void;
-
-  // ---------- Proposta ----------
-  analyzeProposal(text: string, options?: PolicyAIOptions): Promise<void>;
-  cancelAnalysis(): void;
-  confirmProposal(proposal?: { text: string; analysis: AIInterpretation; name?: string }): boolean;
-  discardProposal(): void;
-
-  // ---------- Helpers ----------
-  getContextInput(proposalText: string): ContextInput | null;
 }
 
 // ============================================================
-// HELPERS INTERNOS
+// HELPERS
 // ============================================================
-
-let currentAnalysisToken: { signal: AbortSignal; cancel: () => void } | null = null;
-let saveManager: SaveManager | null = null;
-
-/** Quantos snapshots manter no histórico do contexto. */
-const HISTORY_SNAPSHOTS = 6;
-
-function emptyStateDeltas(): Record<StateId, Record<string, number>> {
-  return Object.fromEntries(STATE_IDS.map((id) => [id, {}])) as Record<StateId, Record<string, number>>;
-}
 
 let policyCounter = 0;
 function newPolicyId(): string {
   policyCounter += 1;
   return `pol_${Date.now().toString(36)}_${policyCounter}`;
-}
-
-/** Converte AIInterpretation em ActivePolicy (o que o motor vai processar). */
-function buildActivePolicy(
-  id: string,
-  name: string,
-  analysis: AIInterpretation,
-): ActivePolicy {
-  const magnitude = analysis.impacto_fiscal.magnitude;
-  const fiscalBase = analysis.impacto_fiscal.valor_anual_bi !== undefined
-    ? analysis.impacto_fiscal.valor_anual_bi * 1e9
-    : FISCAL_MAGNITUDE_REAIS[magnitude] ?? 0;
-
-  let fiscalAnnual = 0;
-  if (analysis.impacto_fiscal.tipo === 'custo') fiscalAnnual = -fiscalBase;
-  else if (analysis.impacto_fiscal.tipo === 'economia') fiscalAnnual = +fiscalBase;
-
-  return {
-    id,
-    name,
-    type: analysis.instrumento,
-    targetStates: analysis.estados_alvo,
-    effects: analysis.indicadores,
-    groupReactions: analysis.grupos,
-    implementationMonths: analysis.implementationMonths ?? 0,
-    effectRampUpMonths: analysis.effectRampUpMonths ?? 0,
-    durationType: analysis.durationType ?? 'permanent',
-    durationMonths: analysis.durationMonths ?? 0,
-    activeMonths: 0,
-    fiscalAnnual,
-  };
-}
-
-/** Deriva um nome curto e legível para a política. */
-function derivePolicyName(text: string, analysis: AIInterpretation): string {
-  if (analysis.objetivo) return analysis.objetivo.slice(0, 80);
-  if (analysis.interpretacao) return analysis.interpretacao.slice(0, 80);
-  return text.slice(0, 80);
 }
 
 // ============================================================
@@ -155,8 +109,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   game: null,
   saveId: null,
   pendingProposal: null,
-  lastTurnLog: null,
-  lastTurnSummary: null,
+  negotiation: {},
+  votingOutcome: null,
+  lastMedia: null,
   isAnalyzing: false,
   isRunningTurn: false,
   lastError: null,
@@ -165,59 +120,26 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   // CICLO DE VIDA
   // ============================================================
 
-  async newGame(profile, name = 'Nova Partida') {
-    const game = buildInitialState({ profile });
+  async newGame(name = 'Nova Partida', partyId) {
+    const game = createInitialState();
+    game.playerName = name;
+    game.playerPartyId = partyId;
+
     const saveId = await createSave(name, game);
-    saveManager = new SaveManager(saveId);
     set({
       game,
       saveId,
       pendingProposal: null,
-      lastTurnLog: null,
-      lastTurnSummary: null,
+      negotiation: {},
+      votingOutcome: null,
+      lastMedia: null,
       lastError: null,
       isAnalyzing: false,
       isRunningTurn: false,
     });
   },
 
-  reset() {
-    if (currentAnalysisToken) {
-      currentAnalysisToken.cancel();
-      currentAnalysisToken = null;
-    }
-    set({
-      game: null,
-      saveId: null,
-      pendingProposal: null,
-      lastTurnLog: null,
-      lastTurnSummary: null,
-      lastError: null,
-      isAnalyzing: false,
-      isRunningTurn: false,
-    });
-  },
-
-  hydrate(state, saveId) {
-    saveManager = new SaveManager(saveId);
-    set({
-      game: state,
-      saveId,
-      pendingProposal: null,
-      lastError: null,
-    });
-  },
-
-  exportState() {
-    return get().game;
-  },
-
-  // Wrapper para compatibilidade com o menu (PlayerProfile → ProfileContext)
-  async createNewGame(profile: PlayerProfile, name = 'Nova Partida') {
-    await get().newGame(profileToContext(profile), name);
-  },
-
-  async loadGame(saveId: number) {
+  async loadGame(saveId) {
     const save = await loadSave(saveId);
     if (!save) {
       set({ lastError: 'Save não encontrado.' });
@@ -226,277 +148,306 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     get().hydrate(save.game, saveId);
   },
 
+  async listSaves() {
+    return listSaves();
+  },
+
+  async deleteSave(saveId) {
+    await deleteSave(saveId);
+    if (get().saveId === saveId) get().reset();
+  },
+
+  hydrate(state, saveId) {
+    set({
+      game: state,
+      saveId,
+      pendingProposal: null,
+      negotiation: {},
+      votingOutcome: null,
+      lastMedia: state.media ?? null,
+      lastError: null,
+    });
+  },
+
+  reset() {
+    set({
+      game: null,
+      saveId: null,
+      pendingProposal: null,
+      negotiation: {},
+      votingOutcome: null,
+      lastMedia: null,
+      lastError: null,
+      isAnalyzing: false,
+      isRunningTurn: false,
+    });
+  },
+
+  // ============================================================
+  // SLIDERS
+  // ============================================================
+
+  setSlider(id, value) {
+    const { game, saveId } = get();
+    if (!game) return;
+
+    const next: GameState = {
+      ...game,
+      sliders: { ...game.sliders, [id]: value },
+    };
+
+    set({ game: next });
+    if (saveId != null) void updateSave(saveId, next);
+  },
+
+  saveSlider(id, value) {
+    const { game, saveId } = get();
+    if (!game || game.sliderSavedAtTurn?.[id] === game.turn) return false;
+
+    const definition = SLIDERS[id];
+    const bounded = Math.min(definition.max, Math.max(definition.min, value));
+    const previousValue = game.sliders[id];
+    const next: GameState = {
+      ...game,
+      sliders: { ...game.sliders, [id]: bounded },
+      sliderSavedAtTurn: { ...game.sliderSavedAtTurn, [id]: game.turn },
+      sliderChangeHistory: [
+        ...(game.sliderChangeHistory ?? []),
+        { sliderId: id, previousValue, newValue: bounded, turn: game.turn },
+      ],
+    };
+
+    set({ game: next });
+    if (saveId != null) void updateSave(saveId, next);
+    return true;
+  },
+
+  // ============================================================
+  // PROPOSTA (IA)
+  // ============================================================
+
+  async analyzeProposal(text) {
+    const { game } = get();
+    if (!game) return;
+
+    set({ isAnalyzing: true, lastError: null, pendingProposal: null });
+
+    try {
+      const result = await interpretMeasure(text, game);
+
+      if (!result.success || !result.policy) {
+        set({
+          isAnalyzing: false,
+          lastError: result.errors.join(' • ') || 'A IA não conseguiu interpretar a medida.',
+        });
+        return;
+      }
+
+      set({
+        isAnalyzing: false,
+        pendingProposal: {
+          text,
+          policy: result.policy,
+          errors: result.errors,
+          warnings: result.warnings,
+          createdAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      set({
+        isAnalyzing: false,
+        lastError: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
+
+  discardProposal() {
+    set({ pendingProposal: null, negotiation: {}, votingOutcome: null });
+  },
+
+  confirmProposal() {
+    const { game, pendingProposal } = get();
+    if (!game || !pendingProposal) return false;
+
+    // Reconstrói com ID único + status voting
+    const policy: PolicyMeasure = {
+      ...pendingProposal.policy,
+      id: newPolicyId(),
+      status: 'voting',
+      createdAtTurn: game.turn,
+    };
+
+    const next: GameState = {
+      ...game,
+      pendingPolicies: [...game.pendingPolicies, policy],
+    };
+
+    set({ game: next, pendingProposal: null, negotiation: {}, votingOutcome: null });
+    return true;
+  },
+
+  // ============================================================
+  // NEGOCIAÇÃO
+  // ============================================================
+
+  setOffer(partyId, offerId, enable) {
+    const negotiation = { ...get().negotiation };
+    const current = new Set(negotiation[partyId] ?? []);
+    if (enable) current.add(offerId);
+    else current.delete(offerId);
+    negotiation[partyId] = Array.from(current);
+    set({ negotiation });
+  },
+
+  clearOffers() {
+    set({ negotiation: {} });
+  },
+
+  async projectVoting() {
+    const { game, saveId, negotiation, pendingProposal } = get();
+    if (!game || saveId == null) return;
+
+    // Pega a última política pendente (a mais recente confirmada)
+    const policy = pendingProposal?.policy ?? game.pendingPolicies[game.pendingPolicies.length - 1];
+    if (!policy) {
+      set({ lastError: 'Nenhuma medida para projetar.' });
+      return;
+    }
+
+    try {
+      const { negotiation: resolved, diluicao } = resolveOffers(negotiation);
+
+      const projection = await projectPolicyVoting(saveId, {
+        state: game,
+        policy,
+        negotiation: resolved,
+        dilutionPenalty: diluicao * 20,
+      });
+
+      // Guarda só a projeção (não altera a política)
+      set({ lastError: null });
+      // A UI pode ler `projection` — deixamos como campo local via retorno
+      // (para simplificar, jogamos em lastError como string legível se quiser mostrar)
+      console.info('[projection]', projection);
+    } catch (err) {
+      set({ lastError: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
+  // ============================================================
+  // VOTAÇÃO
+  // ============================================================
+
+  async submitToVoting(playerPartyId) {
+    const { game, saveId, negotiation } = get();
+    if (!game || saveId == null) return;
+
+    const partyId = playerPartyId ?? game.playerPartyId ?? null;
+
+    const policy = game.pendingPolicies[game.pendingPolicies.length - 1];
+    if (!policy) {
+      set({ lastError: 'Nenhuma medida pendente para votar.' });
+      return;
+    }
+
+    try {
+      const { negotiation: resolved, custoAprovacao, diluicao } = resolveOffers(
+        negotiation,
+        partyId,
+      );
+
+      // Aplica diluição no conteúdo da medida antes de votar
+      const diluted = applyDilution(policy, diluicao);
+      diluted.negotiationCost = custoAprovacao;
+
+      const outcome = await runPolicyVoting(saveId, {
+        state: game,
+        policy: diluted,
+        playerPartyId: partyId,
+        negotiation: resolved,
+        dilutionPenalty: diluicao * 20,
+      });
+
+      set({ votingOutcome: outcome });
+
+      if (outcome.approved) {
+        // Atualiza a política em pendingPolicies para a versão diluída
+        const pendingPolicies = game.pendingPolicies.map(p =>
+          p.id === policy.id ? diluted : p,
+        );
+        let next: GameState = { ...game, pendingPolicies };
+
+        // Ativa (aplica sliders + custo de negociação)
+        next = activatePolicy(next, diluted.id);
+
+        set({ game: next, negotiation: {}, pendingProposal: null });
+        if (saveId != null) void updateSave(saveId, next);
+      } else {
+        // Rejeitada: move para histórico e remove de pending
+        const next: GameState = {
+          ...game,
+          pendingPolicies: game.pendingPolicies.filter(p => p.id !== policy.id),
+        };
+        set({ game: next, negotiation: {} });
+        if (saveId != null) void updateSave(saveId, next);
+      }
+    } catch (err) {
+      set({ lastError: err instanceof Error ? err.message : String(err) });
+    }
+  },
+
   // ============================================================
   // TURNO
   // ============================================================
 
   runMonth() {
-    const prepared = get().prepareMonth();
-    if (prepared) get().commitPreparedMonth(prepared);
-  },
+    const { game, saveId, isRunningTurn } = get();
+    if (!game || isRunningTurn) return;
 
-  prepareMonth() {
-    const { game, isRunningTurn } = get();
-    console.log('=== RUN MONTH', game?.month, '===');
-    console.log('activePolicies:', game?.activePolicies);
-    console.log('salario antes:', game?.nationalIndicators.salario_minimo);
+    set({ isRunningTurn: true, lastError: null });
 
-    if (!game || isRunningTurn) return null;
-    set({ lastError: null });
     try {
-      // Snapshot do mês que está terminando (antes de rodar o turno)
-      const snapshot = snapshotFromState(game);
-      const newHistory = [...game.history, snapshot].slice(-HISTORY_SNAPSHOTS);
-
-      const result = runGameTurn({
-        ...game,
-        history: newHistory,
-        rawDeltas: { states: emptyStateDeltas(), national: {} },
-      });
-
-      return {
-        game: {
-          ...game,
-          year: result.year,
-          month: result.month,
-          stateIndicators: result.stateIndicators,
-          nationalIndicators: result.nationalIndicators,
-          macros: result.macros,
-          groupApprovals: result.groupApprovals,
-          stateApprovals: result.stateApprovals,
-          nationalApproval: result.nationalApproval,
-          activePolicies: result.activePolicies,
-          pendingEffects: result.pendingEffects,
-          activeReactions: result.activeReactions,
-          policyHistory: result.policyHistory,
-          history: newHistory,
-        },
-        log: result.log,
-        summary: result.summary,
-      };
-    } catch (err) {
+      const next = advanceTurn(game);
       set({
-        lastError: err instanceof Error ? err.message : String(err),
+        game: next,
+        lastMedia: next.media ?? null,
+        isRunningTurn: false,
+        votingOutcome: null,
       });
-      return null;
-    }
-  },
-
-  commitPreparedMonth(prepared) {
-    set({
-      game: prepared.game,
-      lastTurnLog: prepared.log,
-      lastTurnSummary: prepared.summary,
-      isRunningTurn: false,
-      lastError: null,
-    });
-
-    if (saveManager) {
-      void saveManager.persist(prepared.game).catch((err) => {
-        set({
-          lastError: err instanceof Error
-            ? `Falha ao salvar o histórico mensal: ${err.message}`
-            : 'Falha ao salvar o histórico mensal.',
+      if (saveId != null) {
+        void updateSave(saveId, next).catch(err => {
+          set({ lastError: `Falha ao salvar: ${err.message}` });
         });
-      });
-    }
-  },
-
-  // ============================================================
-  // PROPOSTA
-  // ============================================================
-
-  async analyzeProposal(text, options) {
-    const { game } = get();
-    if (!game) return;
-
-    // Cancela análise anterior, se houver
-    if (currentAnalysisToken) currentAnalysisToken.cancel();
-    currentAnalysisToken = createCancellationToken();
-    const token = currentAnalysisToken;
-
-    set({ isAnalyzing: true, lastError: null, pendingProposal: null });
-
-    try {
-      const input = get().getContextInput(text);
-      if (!input) throw new Error('Estado de jogo indisponível.');
-
-      const result = await analyzePolicy(input, {
-        ...options,
-        signal: token.signal,
-      });
-
-      if (token.signal.aborted) return;
-
-      console.info('[policyAI] Análise validada', {
-        instrumento: result.analysis.instrumento,
-        indicadores: result.analysis.indicadores,
-        implementationMonths: result.analysis.implementationMonths ?? 0,
-        effectRampUpMonths: result.analysis.effectRampUpMonths ?? 0,
-        durationType: result.analysis.durationType ?? 'permanent',
-        durationMonths: result.analysis.durationMonths ?? 0,
-        warnings: result.metadata.attemptLog.flatMap((attempt) => attempt.warnings),
-        rejected: result.metadata.attemptLog.flatMap((attempt) => attempt.rejected),
-      });
-
-      set({
-        pendingProposal: {
-          text,
-          analysis: result.analysis,
-          metadata: result.metadata,
-          createdAt: Date.now(),
-        },
-        isAnalyzing: false,
-      });
+      }
     } catch (err) {
-      if (token.signal.aborted) return;
       set({
-        isAnalyzing: false,
+        isRunningTurn: false,
         lastError: err instanceof Error ? err.message : String(err),
       });
-    } finally {
-      if (currentAnalysisToken === token) currentAnalysisToken = null;
     }
-  },
-
-  cancelAnalysis() {
-    if (currentAnalysisToken) {
-      currentAnalysisToken.cancel();
-      currentAnalysisToken = null;
-    }
-    set({ isAnalyzing: false, pendingProposal: null });
-  },
-
-  confirmProposal(proposalInput) {
-    const { game, pendingProposal } = get();
-    const proposal = proposalInput ?? pendingProposal;
-    if (!game || !proposal) {
-      console.error('[policy] Assinatura cancelada: jogo ou proposta indisponível.', {
-        hasGame: !!game,
-        hasPendingProposal: !!pendingProposal,
-        hasExplicitProposal: !!proposalInput,
-      });
-      return false;
-    }
-
-    const id = newPolicyId();
-    const name = ('name' in proposal && proposal.name) || derivePolicyName(proposal.text, proposal.analysis);
-    const policy = buildActivePolicy(id, name, proposal.analysis);
-    const nextGame: GameState = {
-      ...game,
-      activePolicies: [...game.activePolicies, policy],
-      policyHistory: [
-        ...game.policyHistory,
-        { monthIndex: monthIndex(game.year, game.month), id },
-      ],
-    };
-
-    set({
-      game: nextGame,
-      pendingProposal: null,
-    });
-
-    const signed = get().game?.activePolicies.some((active) => active.id === id) ?? false;
-    if (!signed) {
-      console.error('[policy] A medida não permaneceu no estado do jogo após a assinatura.', { id });
-      return false;
-    }
-    console.info('[policy] Medida assinada e adicionada ao jogo', {
-      id,
-      name,
-      instrument: policy.type,
-      effects: policy.effects,
-      implementationMonths: policy.implementationMonths,
-      effectRampUpMonths: policy.effectRampUpMonths,
-      durationType: policy.durationType,
-      durationMonths: policy.durationMonths,
-      activeMonths: policy.activeMonths,
-      activePolicyCount: get().game?.activePolicies.length ?? 0,
-    });
-    return true;
-  },
-
-  discardProposal() {
-    set({ pendingProposal: null });
-  },
-
-  // ============================================================
-  // HELPERS
-  // ============================================================
-
-  getContextInput(proposalText) {
-    const { game } = get();
-    if (!game) return null;
-
-    return {
-      month: game.month,
-      proposal: proposalText,
-      profile: game.profile,
-      stateIndicators: game.stateIndicators,
-      nationalIndicators: game.nationalIndicators,
-      macros: game.macros,
-      groupApprovals: game.groupApprovals,
-      stateApprovals: game.stateApprovals,
-      nationalApproval: game.nationalApproval,
-      activePolicies: game.activePolicies,
-      pendingEffects: game.pendingEffects,
-      activeReactions: game.activeReactions,
-      history: game.history,
-    };
   },
 }));
 
 // ============================================================
 // SELETORES
 // ============================================================
-// Importe e use como `useGameStore(selectMonth)` para evitar re-render
-// de componentes que não se importam com o estado inteiro.
 
 export const selectGame = (s: GameStoreState) => s.game;
-export const selectMonth = (s: GameStoreState) => s.game?.month ?? 0;
-export const selectNationalApproval = (s: GameStoreState) =>
-  s.game?.nationalApproval ?? 50;
-export const selectMacros = (s: GameStoreState) => s.game?.macros ?? {};
-export const selectNationalIndicators = (s: GameStoreState) =>
-  s.game?.nationalIndicators ?? {};
-export const selectStateIndicators = (s: GameStoreState) =>
-  s.game?.stateIndicators ?? {};
-export const selectStateApprovals = (s: GameStoreState) =>
-  s.game?.stateApprovals ?? {};
-export const selectGroupApprovals = (s: GameStoreState) =>
-  s.game?.groupApprovals ?? {};
-export const selectActivePolicies = (s: GameStoreState) =>
-  s.game?.activePolicies ?? [];
-export const selectActiveReactions = (s: GameStoreState) =>
-  s.game?.activeReactions ?? [];
-export const selectPolicyHistory = (s: GameStoreState) =>
-  s.game?.policyHistory ?? [];
+export const selectTurn = (s: GameStoreState) => s.game?.turn ?? 0;
+export const selectSliders = (s: GameStoreState) => s.game?.sliders ?? null;
+export const selectIndicators = (s: GameStoreState) => s.game?.indicators ?? null;
+export const selectGroups = (s: GameStoreState) => s.game?.groups ?? null;
+export const selectStates = (s: GameStoreState) => s.game?.states ?? null;
+export const selectActivePolicies = (s: GameStoreState) => s.game?.activePolicies ?? [];
+export const selectPendingPolicies = (s: GameStoreState) => s.game?.pendingPolicies ?? [];
 export const selectHistory = (s: GameStoreState) => s.game?.history ?? [];
-export const selectProfile = (s: GameStoreState) => s.game?.profile ?? null;
+export const selectApproval = (s: GameStoreState) => s.game?.indicators.aprovacao ?? 50;
 
 export const selectPendingProposal = (s: GameStoreState) => s.pendingProposal;
+export const selectVotingOutcome = (s: GameStoreState) => s.votingOutcome;
+export const selectNegotiation = (s: GameStoreState) => s.negotiation;
+export const selectLastMedia = (s: GameStoreState) => s.lastMedia;
+
 export const selectIsAnalyzing = (s: GameStoreState) => s.isAnalyzing;
 export const selectIsRunningTurn = (s: GameStoreState) => s.isRunningTurn;
-export const selectLastTurnSummary = (s: GameStoreState) => s.lastTurnSummary;
-export const selectLastTurnLog = (s: GameStoreState) => s.lastTurnLog;
 export const selectLastError = (s: GameStoreState) => s.lastError;
-
-/** Fábrica de seletor para indicador nacional específico. */
-export const selectNationalIndicator = (id: string) =>
-  (s: GameStoreState) => s.game?.nationalIndicators[id];
-
-/** Fábrica de seletor para macro específico. */
-export const selectMacro = (id: string) =>
-  (s: GameStoreState) => s.game?.macros[id];
-
-/** Fábrica de seletor para indicador estadual específico. */
-export const selectStateIndicator = (stateId: string, indicatorId: string) =>
-  (s: GameStoreState) => s.game?.stateIndicators[stateId as StateId]?.[indicatorId];
-
-/** Fábrica de seletor para aprovação de grupo. */
-export const selectGroupApproval = (groupId: string) =>
-  (s: GameStoreState) => s.game?.groupApprovals[groupId];
-
-/** Fábrica de seletor para aprovação de estado. */
-export const selectStateApproval = (stateId: string) =>
-  (s: GameStoreState) => s.game?.stateApprovals[stateId as StateId];

@@ -3,16 +3,15 @@
    ============================================================ */
 
 .container {
-  /* Paleta de papel e tinta — local ao componente */
-  --paper:        #f4ecd8;   /* papel jornal envelhecido */
-  --paper-2:      #ebe1c8;   /* papel sombreado */
-  --paper-edge:   #d8ccae;   /* borda do papel */
-  --ink:          #1a1815;   /* tinta preta */
-  --ink-soft:     #3a352c;   /* tinta esmaecida */
-  --ink-faint:    #6b6353;   /* tinta fraca */
-  --rule:         #2a2620;   /* filete preto */
-  --rule-soft:    #a89c7c;   /* filete fino */
-  --stamp:        #8a1c1c;   /* vermelho de manchete/urgente */
+  --paper:      #f4ecd8;
+  --paper-2:    #ebe1c8;
+  --paper-edge: #d8ccae;
+  --ink:        #1a1815;
+  --ink-soft:   #3a352c;
+  --ink-faint:  #6b6353;
+  --rule:       #2a2620;
+  --rule-soft:  #a89c7c;
+  --stamp:      #8a1c1c;
 
   display: flex;
   flex-direction: column;
@@ -24,7 +23,6 @@
   box-shadow:
     0 1px 0 rgba(0, 0, 0, 0.04) inset,
     0 10px 28px rgba(2, 6, 15, 0.55);
-  /* leve textura de papel */
   background-image:
     radial-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
     radial-gradient(rgba(0, 0, 0, 0.015) 1px, transparent 1px);
@@ -36,7 +34,7 @@
 }
 
 /* ============================================================
-   CABEÇALHO — cabeça de jornal
+   CABEÇALHO
    ============================================================ */
 
 .header {
@@ -50,7 +48,6 @@
   position: relative;
 }
 
-/* Fio duplo abaixo do título (assinatura de jornal) */
 .header::after {
   content: '';
   position: absolute;
@@ -90,7 +87,6 @@
   text-transform: uppercase;
   color: var(--stamp);
   padding: 3px 8px;
-  background: transparent;
   border: 1px solid var(--stamp);
   border-radius: 2px;
 }
@@ -115,7 +111,6 @@
   margin: 0;
   padding: 28px 12px;
   text-align: center;
-  font-family: 'Georgia', 'Times New Roman', serif;
   font-style: italic;
   font-size: 1rem;
   color: var(--ink-faint);
@@ -125,59 +120,58 @@
 }
 
 /* ============================================================
-   LISTA DE NOTÍCIAS
+   CARROSSEL — janela de altura fixa
    ============================================================ */
 
-.newsList {
-  display: flex;
-  flex-direction: column;
+.carousel {
+  position: relative;
+  height: 420px;
+  min-height: 0;
+  outline: none;
+  border-radius: 2px;
 }
 
-.newsList > .article + .article {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid var(--rule-soft);
-}
-
-.article {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 22px;
-  align-items: start;
-}
-
-/* Manchete principal ocupa tudo */
-.article:first-child {
-  grid-template-columns: 1fr;
-  gap: 14px;
-}
-
-.article:first-child .image {
-  aspect-ratio: 16 / 9;
-}
-
-.article:first-child h3 {
-  font-size: 2rem;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
+.carousel:focus-visible {
+  box-shadow: 0 0 0 2px var(--stamp);
+  box-shadow: 0 0 0 2px var(--stamp), 0 0 0 5px rgba(138, 28, 28, 0.15);
 }
 
 /* ============================================================
-   IMAGEM — foto de jornal
+   ARTIGO — slide único
+   ============================================================ */
+
+.article {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 22px;
+  align-items: stretch;
+  height: 100%;
+  min-width: 0;
+  animation: slideIn 260ms ease both;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ============================================================
+   IMAGEM
    ============================================================ */
 
 .image {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  height: 100%;
   object-fit: cover;
   border-radius: 2px;
   border: 1px solid var(--rule);
   background: var(--paper-2);
-  /* meio-tom sutil de impressão */
-  filter: grayscale(0.65) contrast(1.08) sepia(0.15);
-}
-
-.article:first-child .image {
   filter: grayscale(0.7) contrast(1.1) sepia(0.18);
 }
 
@@ -189,10 +183,13 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  height: 100%;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 
-/* ---------- Meta (veículo + tom) ---------- */
+/* ---------- Meta ---------- */
 
 .meta {
   display: flex;
@@ -204,6 +201,7 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-faint);
+  flex: 0 0 auto;
 }
 
 .meta > span:first-child {
@@ -217,7 +215,6 @@
   font-weight: 400;
 }
 
-/* Tom — carimbo de jornal */
 .meta > span[data-tone] {
   display: inline-flex;
   align-items: center;
@@ -237,14 +234,15 @@
 .article h3 {
   margin: 0;
   font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
-  font-size: 1.35rem;
+  font-size: 1.9rem;
   font-weight: 800;
-  line-height: 1.15;
-  letter-spacing: -0.005em;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
   color: var(--ink);
+  flex: 0 0 auto;
 }
 
-/* ---------- Submanchete (linha fina) ---------- */
+/* ---------- Submanchete ---------- */
 
 .subtitle {
   margin: 0;
@@ -253,11 +251,14 @@
   font-style: italic;
   line-height: 1.4;
   color: var(--ink-soft);
+  flex: 0 0 auto;
 }
 
-/* ---------- Corpo (duas colunas, com fio) ---------- */
+/* ---------- Corpo (2 colunas, com fade) ---------- */
 
 .body {
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0;
   font-family: 'Georgia', 'Times New Roman', serif;
   font-size: 0.92rem;
@@ -268,17 +269,15 @@
   column-count: 2;
   column-gap: 22px;
   column-rule: 1px solid var(--rule-soft);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
 }
 
-.article:first-child .body {
-  column-count: 2;
-}
-
-/* Capitular na manchete principal */
-.article:first-child .body::first-letter {
+.body::first-letter {
   float: left;
   font-family: 'Playfair Display', 'Georgia', serif;
-  font-size: 3.4rem;
+  font-size: 3.2rem;
   line-height: 0.85;
   font-weight: 900;
   padding: 6px 8px 0 0;
@@ -286,7 +285,85 @@
 }
 
 /* ============================================================
-   REDES SOCIAIS — coluna de "repercussão"
+   NAVEGAÇÃO DO CARROSSEL
+   ============================================================ */
+
+.nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Playfair Display', 'Georgia', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  background: rgba(244, 236, 216, 0.94);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, background 160ms ease, transform 160ms ease;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(2, 6, 15, 0.35);
+}
+
+.carousel:hover .nav,
+.carousel:focus-within .nav {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.nav:hover {
+  background: #fff8e4;
+}
+
+.nav:active {
+  transform: translateY(-50%) scale(0.96);
+}
+
+.nav:focus-visible {
+  outline: 2px solid var(--stamp);
+  outline-offset: 2px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.prev { left: 8px; }
+.next { right: 8px; }
+
+.counter {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 8px;
+  font-family: 'Georgia', serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  background: rgba(244, 236, 216, 0.9);
+  border: 1px solid var(--rule-soft);
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.counter strong {
+  color: var(--stamp);
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+   REDES SOCIAIS
    ============================================================ */
 
 .social {
@@ -330,7 +407,6 @@
   position: relative;
 }
 
-/* Aspas tipográficas no canto — cara de citação de jornal */
 .post::before {
   content: '\201C';
   position: absolute;
@@ -366,32 +442,27 @@
    RESPONSIVO
    ============================================================ */
 
-@media (max-width: 720px) {
-  .container {
-    padding: 22px 20px;
+@media (max-width: 820px) {
+  .carousel {
+    height: 460px;
   }
 
-  .article,
-  .article:first-child {
-    grid-template-columns: 1fr;
-    gap: 12px;
+  .article {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 180px minmax(0, 1fr);
+    gap: 14px;
   }
 
-  .body,
-  .article:first-child .body {
-    column-count: 1;
+  .image {
+    height: 180px;
   }
 
-  .header h2 {
-    font-size: 1.6rem;
-  }
-
-  .article:first-child h3 {
+  .article h3 {
     font-size: 1.5rem;
   }
 
-  .article:first-child .body::first-letter {
-    font-size: 2.6rem;
+  .body {
+    column-count: 1;
   }
 }
 
@@ -405,12 +476,34 @@
     font-size: 1.35rem;
   }
 
+  .carousel {
+    height: 420px;
+  }
+
+  .article {
+    grid-template-rows: 140px minmax(0, 1fr);
+  }
+
+  .image {
+    height: 140px;
+  }
+
   .article h3 {
-    font-size: 1.15rem;
+    font-size: 1.25rem;
   }
 
   .body {
     font-size: 0.88rem;
+  }
+
+  .body::first-letter {
+    font-size: 2.6rem;
+  }
+
+  .nav {
+    width: 34px;
+    height: 46px;
+    font-size: 1.6rem;
   }
 }
 
@@ -419,6 +512,10 @@
    ============================================================ */
 
 @media (prefers-reduced-motion: reduce) {
+  .article {
+    animation: none;
+  }
+
   .image {
     filter: none;
   }

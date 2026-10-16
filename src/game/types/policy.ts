@@ -1,108 +1,120 @@
-import type { AIInterpretation } from './ai';
-import type { InstrumentId } from '../data/catalog';
-import type { IndicatorId } from '../data/indicators';
+import type {
+  SliderId,
+  IndicatorId,
+  GroupId,
+  StateId,
+} from './game';
 
-/**
- * O tipo de uma medida é exatamente o instrumento legislativo que a IA
- * classificou (mp, projeto_lei, lei_complementar, pec, decreto…).
- * Fonte única: catálogo em `data/catalog.ts`.
- */
-export type PolicyType = InstrumentId;
+export type PolicyArea =
+  | 'economia'
+  | 'saude'
+  | 'educacao'
+  | 'seguranca'
+  | 'infraestrutura'
+  | 'social'
+  | 'meioAmbiente'
+  | 'gestao';
 
-// ---------------------------------------------------------------------------
-// Efeitos sobre indicadores do catálogo e ajustes fiscais/políticos do motor.
-// Todos opcionais — a medida só declara o que afeta.
-// ---------------------------------------------------------------------------
+export type PolicyType =
+  | 'imposto'
+  | 'beneficio'
+  | 'corte'
+  | 'programa'
+  | 'investimento'
+  | 'regulacao';
 
-export type PolicyEffects = Partial<Record<IndicatorId, number>> & {
-  budget?: number;
-  expenses?: number;
-  approval?: number;
-};
+export type PolicyStatus =
+  | 'draft'
+  | 'voting'
+  | 'approved'
+  | 'rejected'
+  | 'active'
+  | 'expired';
 
-// ---------------------------------------------------------------------------
-// Status possíveis de uma medida no histórico.
-// O store atual só grava 'active' ao apresentar, mas os outros valores
-// ficam prontos para quando a votação marcar aprovada/rejeitada.
-// ---------------------------------------------------------------------------
-
-export type PolicyStatus = 'active' | 'approved' | 'rejected' | 'archived';
-
-// ---------------------------------------------------------------------------
-// Medida em vigor.
-// Espelha exatamente o objeto criado em presentPolicy().
-// ---------------------------------------------------------------------------
-
-export interface ActivePolicy {
-  id: string;
-  name: string;
-  type: PolicyType;
-
-  /** Estados afetados; ausente ou vazio significa todos os estados. */
-  targetStates?: string[];
-
-  /** Efeitos sobre indicadores (aplicados por fração mensal). */
-  effects: PolicyEffects;
-
-  /** Reação de cada grupo social (id do grupo → delta de aprovação). */
-  groupReactions: Record<string, number>;
-
-  /** Mês (relativo) em que a medida começou a vigorar. */
-  implementationMonths: number;
-
-  /** Quantos meses leva para o efeito chegar ao total (0 = aplica direto). */
-  effectRampUpMonths: number;
-
-  /** Permanente ou temporária (reverte ao fim de durationMonths). */
-  durationType: 'permanent' | 'temporary';
-
-  /** Duração em meses (só usada quando durationType === 'temporary'). */
-  durationMonths: number;
-
-  /** Quantos meses já se passaram desde a criação. */
-  activeMonths: number;
-
-  /** Impacto fiscal anual em reais (positivo = economia, negativo = custo). */
-  fiscalAnnual: number;
+export interface PolicyParameter {
+  key: string;
+  label: string;
+  value: number;
+  unit: string;
 }
 
-// ---------------------------------------------------------------------------
-// Registro histórico de uma medida apresentada.
-// Espelha o objeto criado em presentPolicy() como `historyEntry`.
-// ---------------------------------------------------------------------------
+export interface IndicatorEffect {
+  indicatorId: IndicatorId;
+  /** Quanto o indicador se move até o alvo (absoluto) */
+  target: number;
+  /** Meses até o efeito começar */
+  delayMonths: number;
+  /** Meses até o efeito se completar */
+  rampMonths: number;
+  reason: string;
+}
 
-export interface PolicyHistoryEntry {
+/** Efeito estadual direto. Estados não listados recebem somente efeitos indiretos do jogo. */
+export interface StateEffect {
+  stateId: StateId;
+  target: number;
+  delayMonths: number;
+  rampMonths: number;
+  reason: string;
+}
+
+export interface GroupReaction {
+  groupId: GroupId;
+  /** -1 (rejeita) a 1 (apoia) */
+  intensity: number;
+  reason: string;
+}
+
+export interface SliderChange {
+  sliderId: SliderId;
+  newValue: number;
+  reason: string;
+}
+
+export interface PolicyMeasure {
   id: string;
   name: string;
+  description: string;
+  area: PolicyArea;
   type: PolicyType;
 
-  /** Texto original que o jogador digitou ao propor a medida. */
-  originalText: string;
+  // Finanças (em R$ bilhões)
+  initialCost: number;
+  recurringCost: number;   // por ano
+  savings: number;         // por ano
+  revenue: number;         // por ano
 
-  /** Data ISO da criação. */
-  createdAt: string;
+  // Efeitos
+  indicatorEffects: IndicatorEffect[];
+  stateEffects?: StateEffect[];
+  groupReactions: GroupReaction[];
+  sliderChanges?: SliderChange[];
+  parameters?: PolicyParameter[];
 
-  /** Mês da partida em que foi apresentada. */
-  month: number;
+  // Tempo
+  timeToEffect: number;    // meses
+  duration: number | 'permanente';
 
-  /** Interpretação completa da IA (guardada para auditoria/exibição). */
-  analysis: AIInterpretation;
-
-  /** Estado atual no histórico. */
+  // Estado
   status: PolicyStatus;
+  createdAtTurn: number;
+  activatedAtTurn?: number;
+  expiresAtTurn?: number;
 
-  /** Impacto financeiro resumido (para exibir na UI). */
-  impactoFinanceiro: {
-    custoImplementacao: number; // em bilhões de reais
-  };
+  // Metadados
+  source: 'player' | 'ai' | 'catalog';
+  confidence?: number;     // 0–1 (quando vem da IA)
 
-  /** Quantos meses leva para implementar (0 = imediato). */
-  implementationMonths: number;
+  /** Posição ideológica da medida (-3 esquerda .. +3 direita). Opcional — fallback por área. */
+  position?: number;
 
-  effectRampUpMonths?: number;
+  /** Instrumento jurídico. Definido pelo código a partir do PolicyType. */
+  instrumentId?: string;
 
-  durationType?: 'permanent' | 'temporary';
+  /** Custo de aprovação acumulado por negociação (pontos de aprovação) */
+  negotiationCost?: number;
 
-  /** Duração em meses (0 = permanente). */
-  durationMonths: number;
+  /** Diluição aplicada pelo texto (0..0.5) */
+  dilutionApplied?: number;
+
 }

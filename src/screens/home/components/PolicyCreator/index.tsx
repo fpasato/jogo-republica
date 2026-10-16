@@ -1,628 +1,151 @@
 import { useState } from 'react';
 import { useGameStore } from '../../../../store/gameStore';
-import {
-  FISCAL_MAGNITUDE_REAIS,
-  INSTRUMENT_BY_ID,
-} from '../../../../game/data/catalog';
 import { GROUPS } from '../../../../game/data/groups';
-import { getIndicator } from '../../../../game/data/indicators';
-import { STATES, type StateId } from '../../../../game/data/states';
-import type { AIInterpretation } from '../../../../game/types/ai';
-import { checkOllama } from '../../../../game/services/ai/ollamaClient';
-import { Modal } from './modal';
+import { INDICATORS } from '../../../../game/data/indicators';
+import { STATES } from '../../../../game/data/states';
+import type { PolicyArea } from '../../../../game/types/policy';
+import { projectPolicy } from '../../../../game/services/engine/policyProjection';
 import styles from './styles.module.css';
 
-// ============================================================
-// CONSTANTES
-// ============================================================
+interface Props { onCreated: () => void; }
 
-const MAX_EDITS = 5;
-
-const RISK_LABEL: Record<string, string> = {
-  baixo: 'risco jurídico baixo',
-  medio: 'risco jurídico médio',
-  alto: 'risco jurídico alto',
+const AREA_LABEL: Record<PolicyArea, string> = {
+  economia: 'Economia', saude: 'Saúde', educacao: 'Educação', seguranca: 'Segurança pública',
+  infraestrutura: 'Infraestrutura e saneamento', social: 'Assistência social',
+  meioAmbiente: 'Meio ambiente e energia', gestao: 'Administração pública',
 };
 
-const AXIS_LABEL: Record<string, string> = {
-  economia: 'Economia',
-  saude: 'Saúde',
-  educacao: 'Educação',
-  seguranca: 'Segurança',
-  infraestrutura: 'Infraestrutura',
-  social: 'Social',
-  ambiente: 'Meio Ambiente',
-  gestao: 'Gestão',
-  politica: 'Política',
-};
+export function PolicyCreator({ onCreated }: Props) {
+  const [text, setText] = useState('');
+  const pending = useGameStore(s => s.pendingProposal);
+  const game = useGameStore(s => s.game);
+  const isAnalyzing = useGameStore(s => s.isAnalyzing);
+  const lastError = useGameStore(s => s.lastError);
+  const analyze = useGameStore(s => s.analyzeProposal);
+  const confirm = useGameStore(s => s.confirmProposal);
+  const discard = useGameStore(s => s.discardProposal);
+  const projection = pending && game ? projectPolicy(pending.policy, game) : null;
 
-// ============================================================
-// HELPERS
-// ============================================================
-
-function formatBRL(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1e12) return `R$ ${(abs / 1e12).toFixed(1)} trilhão`;
-  if (abs >= 1e9) return `R$ ${(abs / 1e9).toFixed(0)} bilhões`;
-  if (abs >= 1e6) return `R$ ${(abs / 1e6).toFixed(0)} milhões`;
-  return `R$ ${abs.toFixed(0)}`;
-}
-
-function formatSigned(n: number, decimals = 2): string {
-  if (!Number.isFinite(n)) return '—';
-  const s = n.toFixed(decimals).replace(/\.?0+$/, '');
-  return n > 0 ? `+${s}` : s;
-}
-
-function groupName(id: string): string {
-  return GROUPS.find((g) => g.id === id)?.nome ?? id;
-}
-
-function indicatorLabel(id: string): {
-  nome: string;
-  unidade: string;
-  direction: string;
-} {
-  try {
-    const ind = getIndicator(id);
-    return { nome: ind.name, unidade: ind.unit, direction: ind.direction };
-  } catch {
-    return { nome: id, unidade: '', direction: 'neutral' };
-  }
-}
-
-function stateLabel(id: string): string {
-  return STATES[id as StateId]?.name ?? id;
-}
-
-function areaLabel(id: string): string {
-  return AXIS_LABEL[id] ?? id;
-}
-
-// ============================================================
-// CONTADOR DE TENTATIVAS
-// ============================================================
-
-function AttemptCounter({
-  used,
-  max,
-}: {
-  used: number;
-  max: number;
-}) {
-  const left = Math.max(0, max - used);
-  const level = left === 0 ? 'danger' : left <= 2 ? 'warning' : 'ok';
-
-  return (
-    <div className={styles.counter} data-level={level}>
-      <div className={styles.counterDots} aria-hidden="true">
-        {Array.from({ length: max }).map((_, i) => (
-          <span
-            key={i}
-            className={styles.counterDot}
-            data-filled={i < used}
-          />
-        ))}
-      </div>
-      <span className={styles.counterText}>
-        {used} / {max}
-      </span>
-    </div>
-  );
-}
-
-// ============================================================
-// BLOCO DE ANÁLISE
-// ============================================================
-
-function AnalysisBlock({ ai }: { ai: AIInterpretation }) {
-  const objetivo = ai.objetivo;
-  const areaPrincipal = ai.area_principal;
-  const secundarias = ai.areas_secundarias ?? [];
-  const beneficios = ai.beneficios ?? [];
-  const riscos = ai.riscos ?? [];
-  const colaterais = ai.efeitos_colaterais ?? [];
-  const alvos = ai.estados_alvo ?? [];
-
-  const vazio =
-    !objetivo &&
-    !areaPrincipal &&
-    secundarias.length === 0 &&
-    beneficios.length + riscos.length + colaterais.length === 0 &&
-    alvos.length === 0;
-
-  if (vazio) return null;
-
-  return (
-    <div className={styles.analysis}>
-      {objetivo && (
-        <p>
-          <strong>Objetivo:</strong> {objetivo}
-        </p>
-      )}
-
-      {(areaPrincipal || secundarias.length > 0 || alvos.length > 0) && (
-        <div className={styles.tags}>
-          {areaPrincipal && (
-            <span className={`${styles.tag} ${styles.tagPrimary}`}>
-              {areaLabel(areaPrincipal)}
-            </span>
-          )}
-          {secundarias.map((a) => (
-            <span key={a} className={styles.tag}>
-              {areaLabel(a)}
-            </span>
-          ))}
-          {alvos.length > 0 ? (
-            alvos.map((uf) => (
-              <span
-                key={uf}
-                className={styles.tag}
-                title="Estado citado na proposta"
-              >
-                📍 {stateLabel(uf)}
-              </span>
-            ))
-          ) : (
-            <span className={styles.tag}>Abrangência nacional</span>
-          )}
-        </div>
-      )}
-
-      {(beneficios.length > 0 ||
-        riscos.length > 0 ||
-        colaterais.length > 0) && (
-        <div className={styles.analysisGrid}>
-          {beneficios.length > 0 && (
-            <div>
-              <h4>Benefícios</h4>
-              <ul className={styles.effectList}>
-                {beneficios.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {riscos.length > 0 && (
-            <div>
-              <h4>Riscos</h4>
-              <ul className={styles.effectList}>
-                {riscos.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {colaterais.length > 0 && (
-            <div>
-              <h4>Efeitos colaterais</h4>
-              <ul className={styles.effectList}>
-                {colaterais.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// TIPOS
-// ============================================================
-
-export interface PolicyCreatorProps {
-  onConfirm?: (policy: PendingPolicy) => void;
-  onAdvanceMonth?: () => void | Promise<void>;
-  testMode?: boolean;
-}
-
-export interface PendingPolicy {
-  instrument: string;
-  name: string;
-  originalText: string;
-  interpretation: AIInterpretation;
-}
-
-// ============================================================
-// COMPONENTE
-// ============================================================
-
-export function PolicyCreator({
-  onConfirm,
-  onAdvanceMonth,
-  testMode = false,
-}: PolicyCreatorProps) {
-  const analyzeProposal = useGameStore((s) => s.analyzeProposal);
-  const confirmProposal = useGameStore((s) => s.confirmProposal);
-  const discardProposal = useGameStore((s) => s.discardProposal);
-  const runMonth = useGameStore((s) => s.runMonth);
-
-  const pending = useGameStore((s) => s.pendingProposal);
-  const isAnalyzing = useGameStore((s) => s.isAnalyzing);
-  const isRunningTurn = useGameStore((s) => s.isRunningTurn);
-  const lastError = useGameStore((s) => s.lastError);
-
-  const [policyName, setPolicyName] = useState('');
-  const [proposalText, setProposalText] = useState('');
-  const [attemptsUsed, setAttemptsUsed] = useState(0);
-  const [isAdvancing, setIsAdvancing] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-
-  const busy = isAnalyzing || isRunningTurn || isAdvancing;
-  const attemptsLeft = Math.max(0, MAX_EDITS - attemptsUsed);
-  const canAttempt = attemptsLeft > 0;
-  const isLimitReached = attemptsUsed >= MAX_EDITS;
-
-  // ---------- Handlers ----------
-
-  const handleAnalyze = async () => {
-    if (!proposalText.trim() || !canAttempt || busy) return;
-    setConnectionError(null);
-    setAttemptsUsed((n) => n + 1);
-    try {
-      await checkOllama();
-      discardProposal();
-      await analyzeProposal(proposalText);
-    } catch (error) {
-      setConnectionError(
-        error instanceof Error ? error.message : String(error),
-      );
-    }
+  const handleAnalyze = () => {
+    if (text.trim().length >= 10) void analyze(text.trim());
   };
-
-  const handleEdit = () => {
-    if (busy) return;
-    discardProposal();
-  };
-
-  const resetForm = () => {
-    setPolicyName('');
-    setProposalText('');
-    setAttemptsUsed(0);
-  };
-
-  const handleDiscard = () => {
-    discardProposal();
-    resetForm();
-  };
-
   const handleConfirm = () => {
-    if (!pending) return;
-    const policy = {
-      instrument: pending.analysis.instrumento,
-      name:
-        policyName ||
-        pending.analysis.objetivo ||
-        pending.analysis.interpretacao,
-      originalText: pending.text,
-      interpretation: pending.analysis,
-    };
-    if (onConfirm) onConfirm(policy);
-    else confirmProposal();
-    resetForm();
-  };
-
-  const handleAdvanceMonth = async () => {
-    if (busy) return;
-    setIsAdvancing(true);
-    resetForm();
-    try {
-      if (onAdvanceMonth) await onAdvanceMonth();
-      else runMonth();
-    } finally {
-      setIsAdvancing(false);
+    if (confirm()) {
+      setText('');
+      onCreated();
     }
   };
 
-  // ---------- Derivados ----------
-
-  const instrument = pending
-    ? INSTRUMENT_BY_ID[pending.analysis.instrumento]
-    : null;
-
-  const fiscal = pending?.analysis.impacto_fiscal;
-  const fiscalMagnitude = fiscal
-    ? (fiscal.valor_anual_bi !== undefined
-      ? fiscal.valor_anual_bi * 1e9
-      : FISCAL_MAGNITUDE_REAIS[fiscal.magnitude] ?? 0)
-    : 0;
-  const fiscalAnual =
-    fiscal?.tipo === 'custo'
-      ? -fiscalMagnitude
-      : fiscal?.tipo === 'economia'
-        ? fiscalMagnitude
-        : 0;
-
-  const grupos = pending?.analysis.grupos ?? {};
-  const indicadores = pending?.analysis.indicadores ?? {};
-  const isFallback = !!pending?.analysis._fallback;
-  const modalOpen = !!pending;
-
-  // ---------- Render ----------
-
   return (
-    <>
-      <div className={styles.policyCreator}>
-        <section className={styles.panel}>
-          <header className={styles.panelHeader}>
-            <h2 className={styles.panelTitle}>Nova medida</h2>
-            {!testMode && (
-              <AttemptCounter used={attemptsUsed} max={MAX_EDITS} />
-            )}
-            {testMode && <span className={styles.badge}>Modo de teste</span>}
+    <div className={styles.wrapper}>
+      <section className={styles.composer}>
+        <label htmlFor="policy-description">Descreva a medida</label>
+        <textarea
+          id="policy-description"
+          value={text}
+          onChange={event => setText(event.target.value)}
+          rows={3}
+          placeholder="Ex.: Criar benefício mensal de R$ 600 para famílias de baixa renda."
+        />
+        <button className={styles.primary} onClick={handleAnalyze} disabled={isAnalyzing || text.trim().length < 10}>
+          {isAnalyzing ? 'Interpretando…' : 'Analisar medida'}
+        </button>
+      </section>
+
+      {lastError && <p className={styles.error} role="alert">{lastError}</p>}
+
+      {pending && (
+        <article className={styles.card}>
+          <header className={styles.cardHeader}>
+            <div>
+              <h2>{pending.policy.name}</h2>
+              <span>{AREA_LABEL[pending.policy.area]} · {pending.policy.type}</span>
+            </div>
+            <span className={styles.draft}>Proposta</span>
           </header>
 
-          <div className={styles.field}>
-            <label htmlFor="policy-name">
-              Nome da medida <span>(opcional)</span>
-            </label>
-            <input
-              id="policy-name"
-              type="text"
-              value={policyName}
-              onChange={(e) => setPolicyName(e.target.value)}
-              placeholder="Ex.: Programa de saneamento básico"
-              disabled={busy}
-            />
-          </div>
+          <p className={styles.description}>{pending.policy.description}</p>
 
-          <div className={styles.field}>
-            <label htmlFor="policy-text">Descreva o que deseja mudar</label>
-            <textarea
-              id="policy-text"
-              value={proposalText}
-              onChange={(e) => setProposalText(e.target.value)}
-              placeholder="Ex.: Ampliar o acesso a saneamento básico no Nordeste, priorizando municípios com menor cobertura."
-              rows={6}
-              disabled={busy}
-            />
-          </div>
+          <section className={styles.parameters}>
+            <h3>Parâmetros da medida</h3>
+            {pending.policy.parameters?.length ? pending.policy.parameters.map(parameter => (
+              <div className={styles.parameter} key={parameter.key}>
+                <span>{parameter.label}</span>
+                <b>{parameter.value.toLocaleString('pt-BR')} {parameter.unit}</b>
+              </div>
+            )) : <p className={styles.muted}>A análise não identificou parâmetros numéricos. Confirme os dados no texto da proposta.</p>}
+          </section>
 
-          {(connectionError || lastError) && (
-            <p className={styles.error} role="alert">
-              {connectionError || lastError}
-            </p>
-          )}
-
-          {isLimitReached && !pending && (
-            <p className={styles.error}>
-              Você usou os {MAX_EDITS} envios deste mês. Assine, descarte ou
-              avance o mês.
-            </p>
-          )}
-
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={styles.ghost}
-              onClick={handleAdvanceMonth}
-              disabled={busy}
-              title="Encerra o mês sem propor nenhuma medida"
-            >
-              {isAdvancing ? 'Avançando…' : 'Avançar mês sem medida'}
-            </button>
-
-            <button
-              type="button"
-              className={styles.primary}
-              onClick={handleAnalyze}
-              disabled={busy || !proposalText.trim() || !canAttempt}
-            >
-              {isAnalyzing
-                ? 'Analisando proposta…'
-                : isLimitReached
-                  ? 'Limite de análises atingido'
-                  : `Analisar proposta (${attemptsLeft} restantes)`}
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <Modal
-        open={modalOpen}
-        size="lg"
-        title={
-          isFallback
-            ? 'Análise indisponível'
-            : 'Os ministros entenderam a sua medida como:'
-        }
-        footer={
-          isFallback ? (
-            <>
-              <button
-                type="button"
-                className={styles.ghost}
-                onClick={handleEdit}
-                disabled={busy}
-              >
-                Voltar à proposta
-              </button>
-              <button
-                type="button"
-                className={styles.primary}
-                onClick={() => {
-                  discardProposal();
-                  void handleAnalyze();
-                }}
-                disabled={busy || !proposalText.trim() || !canAttempt}
-              >
-                {canAttempt
-                  ? `Tentar novamente (${attemptsLeft} restantes)`
-                  : 'Sem tentativas restantes'}
-              </button>
-            </>
-          ) : (
-            <>
-              {!testMode && (
-                <button
-                  type="button"
-                  className={`${styles.ghost} ${styles.footerStart}`}
-                  onClick={handleEdit}
-                  disabled={busy}
-                >
-                  Voltar e reescrever
-                </button>
-              )}
-              <button
-                type="button"
-                className={styles.danger}
-                onClick={handleDiscard}
-                disabled={busy}
-              >
-                Descartar
-              </button>
-              {!testMode && (
-                <button
-                  type="button"
-                  className={styles.confirm}
-                  onClick={handleConfirm}
-                  disabled={busy}
-                >
-                  Assinar
-                </button>
-              )}
-            </>
-          )
-        }
-      >
-        {isFallback && pending && (
-          <>
-            <p className={styles.error}>{pending.analysis.interpretacao}</p>
-            <p className={styles.muted}>
-              A proposta não foi enviada para votação. Confira o Ollama e
-              tente novamente.
-            </p>
-          </>
-        )}
-
-        {pending && !isFallback && instrument && (
-          <>
-            <p className={styles.resumo}>
-              {pending.analysis.interpretacao}
-            </p>
-
-            <AnalysisBlock ai={pending.analysis} />
-
-            <div className={styles.instrument}>
-              <span className={styles.instrumentLabel}>Vira</span>
-              <strong className={styles.instrumentName}>
-                {instrument.label}
-              </strong>
-              <span className={styles.muted}>{instrument.regra}</span>
-            </div>
-
-            <h4>Instrumento</h4>
-            <p>
-              {pending.analysis.motivo_instrumento || instrument.quandoUsar}
-            </p>
-
-            <h4>Impacto fiscal</h4>
-            <p>
-              <strong>
-                {fiscal?.tipo === 'neutro' && 'Neutro'}
-                {fiscal?.tipo === 'custo' &&
-                  `Custo de ${formatBRL(Math.abs(fiscalAnual))} por ano`}
-                {fiscal?.tipo === 'economia' &&
-                  `Economia de ${formatBRL(Math.abs(fiscalAnual))} por ano`}
-              </strong>
-              {fiscal?.nota && (
-                <span className={styles.muted}> · {fiscal.nota}</span>
-              )}
-            </p>
-
-            {pending.analysis.intensidade > 0 && (
-              <>
-                <h4>
-                  {instrument.vigoraAoAssinar
-                    ? 'Choque ao assinar'
-                    : 'Choque no dia em que virar lei'}
-                </h4>
-                <p className={styles.muted}>
-                  Intensidade {pending.analysis.intensidade} de 3.
-                </p>
-              </>
-            )}
-
-            {Object.keys(grupos).length > 0 && (
-              <>
-                <h4>Efeito esperado nos grupos</h4>
-                <ul className={styles.effectList}>
-                  {Object.entries(grupos).map(([gid, delta]) => (
-                    <li key={gid}>
-                      <strong>{groupName(gid)}</strong>:{' '}
-                      <span
-                        className={
-                          delta >= 0 ? styles.positive : styles.negative
-                        }
-                      >
-                        {formatSigned(delta)}{' '}
-                        {Math.abs(delta) < 2 ? 'ponto' : 'pontos'}
-                      </span>{' '}
-                      de aprovação
-                    </li>
+          <div className={styles.infoGrid}>
+            <section className={styles.info}>
+              <h3>Impacto fiscal estimado</h3>
+              {projection && <b className={projection.monthlyNet > 0 ? styles.bad : projection.monthlyNet < 0 ? styles.good : styles.unknown}>
+                {projection.monthlyNet > 0 ? 'Gasto líquido' : projection.monthlyNet < 0 ? 'Economia líquida' : 'Sem impacto líquido direto'}: R$ {Math.abs(projection.monthlyNet).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} bi/mês
+              </b>}
+              <small>Implantação R$ {pending.policy.initialCost.toLocaleString('pt-BR')} bi · recorrente R$ {pending.policy.recurringCost.toLocaleString('pt-BR')} bi/ano · economia R$ {pending.policy.savings.toLocaleString('pt-BR')} bi/ano · receita R$ {pending.policy.revenue.toLocaleString('pt-BR')} bi/ano.
+                {projection?.totalCost != null && <> Líquido até o fim: R$ {Math.abs(projection.totalCost).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} bi.</>}
+              </small>
+            </section>
+            <section className={styles.info}>
+              <h3>Indicadores nacionais alterados diretamente · estimativa da IA</h3>
+              {pending.policy.indicatorEffects.length ? (
+                <div className={styles.estimatedEffects}>
+                  {pending.policy.indicatorEffects.map(effect => (
+                    <span className={(INDICATORS[effect.indicatorId]?.direction ?? 0) * effect.target > 0 ? styles.good : (INDICATORS[effect.indicatorId]?.direction ?? 0) * effect.target < 0 ? styles.bad : ''} key={effect.indicatorId}>
+                      <b>{INDICATORS[effect.indicatorId]?.name ?? effect.indicatorId}</b> {effect.target > 0 ? '+' : ''}{effect.target.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} {INDICATORS[effect.indicatorId]?.unit} · começa em {effect.delayMonths}m, gradual por {effect.rampMonths}m · {effect.reason}
+                    </span>
                   ))}
-                </ul>
-              </>
-            )}
+                </div>
+              ) : <b className={styles.unknown}>Não identificados</b>}
+              <small>Os efeitos são aplicados gradualmente; outros indicadores são derivados pelo motor.</small>
+            </section>
+          </div>
 
-            {Object.keys(indicadores).length > 0 && (
-              <>
-                <h4>Efeitos estimados nos indicadores</h4>
-                <ul className={styles.effectList}>
-                  {Object.entries(indicadores).map(([iid, delta]) => {
-                    const info = indicatorLabel(iid);
-                    const bom =
-                      info.direction === 'higher_is_better'
-                        ? delta > 0
-                        : info.direction === 'lower_is_better'
-                          ? delta < 0
-                          : null;
-                    return (
-                      <li key={iid}>
-                        {info.nome}:{' '}
-                        <span
-                          className={
-                            bom === null
-                              ? undefined
-                              : bom
-                                ? styles.positive
-                                : styles.negative
-                          }
-                        >
-                          {formatSigned(delta)} {info.unidade}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </>
-            )}
+          <section className={styles.groups}>
+            <h3>Estados com alteração direta de aprovação</h3>
+            {pending.policy.stateEffects?.length ? pending.policy.stateEffects.map(effect => (
+              <span className={styles.group} key={effect.stateId}>
+                {STATES[effect.stateId]?.name ?? effect.stateId} <b className={effect.target > 0 ? styles.good : styles.bad}>{effect.target > 0 ? '+' : ''}{effect.target.toFixed(1)} p.p.</b> · {effect.reason}
+              </span>
+            )) : <span className={styles.muted}>Nenhum estado indicado. Os demais recebem apenas efeitos indiretos.</span>}
+          </section>
 
-            {pending.analysis.assessoria_juridica && (
-              <p className={styles.legal}>
-                <strong>Assessoria jurídica:</strong>{' '}
-                {pending.analysis.assessoria_juridica}{' '}
-                <span className={styles.muted}>
-                  ({RISK_LABEL[pending.analysis.risco_juridico]})
+          <section className={styles.groups}>
+            <h3>Grupos afetados · apoio atual</h3>
+            {pending.policy.groupReactions.length ? pending.policy.groupReactions.map(reaction => {
+              const group = GROUPS[reaction.groupId];
+              const support = game?.groups[reaction.groupId]?.support;
+              return (
+                <span className={styles.group} key={reaction.groupId}>
+                  {group.name} · apoio atual <b>{support == null ? '—' : `${support.toFixed(1)}%`}</b> · reação estimada{' '}
+                  <b className={reaction.intensity > 0 ? styles.good : reaction.intensity < 0 ? styles.bad : ''}>{reaction.intensity > 0 ? '+' : ''}{reaction.intensity.toFixed(2)}</b>
                 </span>
-              </p>
-            )}
+              );
+            }) : <span className={styles.muted}>A análise não identificou grupos afetados.</span>}
+            <small>A simulação atualiza o apoio ao longo dos turnos.</small>
+          </section>
 
-            {!testMode && (
-              <p className={styles.muted}>
-                Se isto não é o que você quis dizer, volte e reescreva: o mês
-                não foi gasto ainda. Ao assinar, a medida passa a valer e não
-                há como desfazer.
-              </p>
-            )}
-          </>
-        )}
-      </Modal>
-    </>
+          <footer className={styles.footer}>
+            <div className={styles.timeline}>
+              <span>Primeiros efeitos: {pending.policy.timeToEffect} {pending.policy.timeToEffect === 1 ? 'mês' : 'meses'}</span>
+              <b>{pending.policy.duration === 'permanente' ? 'Permanente' : `Ativa por ${pending.policy.duration} meses`}</b>
+              <small>Se aprovada, entra em vigor no próximo mês; os impactos se acumulam gradualmente.</small>
+            </div>
+            <div className={styles.actions}>
+              <button className={styles.primary} onClick={handleConfirm}>Enviar para votação</button>
+              <button className={styles.secondary} onClick={discard}>Descartar</button>
+            </div>
+          </footer>
+
+          {pending.warnings.length > 0 && (
+            <div className={styles.warnings}>
+              {pending.warnings.map((warning, index) => <p key={index}>Atenção: {warning}</p>)}
+            </div>
+          )}
+        </article>
+      )}
+    </div>
   );
 }
 
-export default PolicyCreator;
+export type { PolicyArea };

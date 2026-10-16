@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:rules": "node scripts/test-rules.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@nivo/core": "^0.99.0",
+    "@nivo/line": "^0.99.0",
     "@turf/rewind": "^7.4.0",
     "d3-geo": "^3.1.1",
     "dexie": "^4.4.6",
