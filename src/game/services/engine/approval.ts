@@ -13,8 +13,8 @@ export const clampApproval = (n: number) =>
   Math.min(APPROVAL_MAX, Math.max(APPROVAL_MIN, Number.isFinite(n) ? n : NEUTRAL));
 
 const BASELINE_DRIFT_RATE = 0.02;
-const SENSITIVITY_RATE = 0.25;
-const POLICY_MARK_RATE = 0.25;
+const SENSITIVITY_RATE = 0.85; // Resposta vigorosa às alterações do jogador
+const POLICY_MARK_RATE = 0.35;
 
 export function computeGroupBaseline(
   groupId: string,
@@ -24,7 +24,7 @@ export function computeGroupBaseline(
   const g = getGroup(groupId);
   // govIdeology (-3..+3) e lean (-1..+1)
   const alignment = (govIdeology / 3) * g.lean;
-  let base = 50 + alignment * 15;
+  let base = (g.initialApproval ?? 50) + alignment * 18;
 
   for (const p of activePolicies) {
     const reaction = p.groupReactions[groupId] ?? 0;
@@ -87,10 +87,16 @@ export function indicatorSensitivityDelta(
     if (indDelta === 0) continue;
 
     const ind = getIndicator(indicatorId);
-    // Normalizar direção do indicador se necessário
-    const effectiveDelta = ind.formatKind === 'percent' || ind.formatKind === 'score'
+    // Para indicadores de percentual (ex: IVA, IR), cada 1% de aumento gera impacto direto
+    // Aumentos tributários expressivos geram descontentamento acelerado (não-linear)
+    let effectiveDelta = ind.formatKind === 'percent' || ind.formatKind === 'score'
       ? indDelta
-      : (indDelta / (Math.abs(ind.initial) || 1)) * 10;
+      : (indDelta / (Math.abs(ind.initial) || 1)) * 12;
+
+    // Se for imposto e estiver aumentando muito, amplifica a reprovação
+    if ((indicatorId === 'iva' || indicatorId === 'imposto_renda' || indicatorId === 'imposto_empresas') && indDelta > 3 && weight < 0) {
+      effectiveDelta *= 1.4; // Penalidade por choque tributário abrupto
+    }
 
     const contribution = effectiveDelta * weight * combat * SENSITIVITY_RATE;
     total += contribution;

@@ -1,4 +1,4 @@
-import type { IndicatorDef, IndicatorCategory } from '../../../game/data/indicators';
+import type { IndicatorDef, IndicatorCategory } from '../game/data/indicators';
 
 export type Tom = 'good' | 'bad' | 'neutral';
 

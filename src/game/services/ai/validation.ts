@@ -1,7 +1,7 @@
 import { FISCAL_MAGNITUDE_REAIS, INSTRUMENTS, type InstrumentId } from '../../data/catalog';
 import { INDICATORS_BY_ID } from '../../data/indicators';
 import { GROUPS_BY_ID } from '../../data/groups';
-import { STATE_IDS, type StateId } from '../../data/states';
+
 import { VALID_QUERY_TYPES } from '../../data/queryCatalog';
 import type {
   AIInterpretation,

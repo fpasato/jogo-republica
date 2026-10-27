@@ -1,18 +1,13 @@
-// src/game/services/ai/buildContext.ts
-
-import { INDICATORS_BY_ID, getIndicator } from '../../data/indicators';
 import { GROUPS } from '../../data/groups';
-import { MACRO_INDICATORS, MACRO_BY_ID } from '../../data/macroIndicators';
+import { MACRO_INDICATORS } from '../../data/macroIndicators';
 import { AVAILABLE_QUERIES } from '../../data/queryCatalog';
 import type { ActivePolicy } from '../../types/policy';
 import type {
   PolicyContext,
   ContextInput,
   ContextSnapshot,
-  IndicatorSnapshot,
   GroupSummary,
   ActivePolicyContext,
-  CrisisContext,
   HistoryContext,
   NationalContext,
 } from '../../types/ai';
@@ -28,15 +23,6 @@ function computeTrend(series: number[]): 'subindo' | 'caindo' | 'estável' {
   if (change > threshold) return 'subindo';
   if (change < -threshold) return 'caindo';
   return 'estável';
-}
-
-function nationalSeries(id: string, history: ContextSnapshot[]): number[] {
-  const fromHistory: number[] = [];
-  for (const snap of history) {
-    const v = snap.national[id];
-    if (typeof v === 'number') fromHistory.push(v);
-  }
-  return fromHistory;
 }
 
 function buildNationalContext(

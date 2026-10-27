@@ -1,7 +1,6 @@
 // src/game/data/newsArticles.ts
 
 import type { NewsTheme } from './newsThemes';
-import { NEWS_VEHICLES } from './newsVehicles';
 
 // ============================================================
 // ARTIGOS DE NOTÍCIA PRÉ-DEFINIDOS

@@ -141,6 +141,9 @@ export interface ProfileContext {
     seguranca: number;
     ambiente: number;
     gasto_social: number;
+    trabalho?: number;
+    politica_externa?: number;
+    [key: string]: number | undefined;
   };
 }
 

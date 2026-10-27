@@ -1,4 +1,4 @@
-import { INDICATORS, INDICATOR_IDS } from '../../data/indicators';
+import { INDICATORS } from '../../data/indicators';
 import { GROUPS } from '../../data/groups';
 import { INSTRUMENTS } from '../../data/catalog';
 import type {
@@ -314,8 +314,6 @@ export function buildInitialPrompt(context: PolicyContext): string {
     ...context,
     national: {
       ...context.national,
-      macro: context.national.macro.slice(0, 6),
-      fiscal: context.national.fiscal.slice(0, 4),
     },
     states: context.states.filter((state) => state.highlighted).slice(0, 6),
     groups: context.groups.slice(0, 8),

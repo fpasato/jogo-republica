@@ -27,6 +27,8 @@ export const defaultProfile = (name = 'Jogador'): ProfileContext => ({
     seguranca: -1,
     ambiente: 1,
     gasto_social: 1,
+    trabalho: -1,
+    politica_externa: -1,
   },
 });
 
@@ -40,6 +42,9 @@ export interface SliderValues {
   seguranca: number;
   ambiente: number;
   gasto_social: number;
+  trabalho: number;
+  politica_externa: number;
+  [key: string]: number;
 }
 
 /** Normaliza sliders respeitando o orçamento de pontos. */
@@ -50,6 +55,8 @@ export function normalizeSliders(input: Partial<SliderValues>): SliderValues {
     seguranca: input.seguranca ?? 0,
     ambiente: input.ambiente ?? 0,
     gasto_social: input.gasto_social ?? 0,
+    trabalho: input.trabalho ?? 0,
+    politica_externa: input.politica_externa ?? 0,
   };
   const total = Object.values(out).reduce((s, v) => s + Math.abs(v), 0);
   if (total <= SLIDER_BUDGET) return out;
@@ -65,24 +72,24 @@ export function normalizeSliders(input: Partial<SliderValues>): SliderValues {
 // ============================================================
 
 /**
- * Deriva `govIdeology` (-3..+3) dos eixos.
- * Peso maior no eixo econômico, que é o principal no jogo.
+ * Deriva `govIdeology` (-3..+3) dos eixos políticos sem precisar de slider específico de esquerda/direita.
+ * A soma ponderada dos eixos define a posição no espectro político brasileiro.
  */
 export function computeGovIdeology(axes: SliderValues): number {
-  const weights = {
-    economia: 0.40,
+  const weights: Record<string, number> = {
+    economia: 0.25,
     costumes: 0.20,
     seguranca: 0.15,
-    ambiente: 0.10,
-    gasto_social: 0.15,
+    ambiente: -0.10, // ambientalista tende a esquerda (-), produtivista a direita (+)
+    gasto_social: -0.15, // expansão social tende a centro-esquerda (-), teto fiscal a direita (+)
+    trabalho: 0.20, // flexibilização tende a direita (+), CLT a esquerda (-)
+    politica_externa: 0.10, // alinhamento ocidental pró-mercado tende a direita (+), sul global a esquerda (-)
   };
   let sum = 0;
-  for (const k of Object.keys(weights) as (keyof SliderValues)[]) {
-    sum += (axes[k] ?? 0) * weights[k];
+  for (const [k, w] of Object.entries(weights)) {
+    sum += (axes[k] ?? 0) * w;
   }
-  // Sliders vão de -3..+3; resultado também -3..+3, mas com peso diluído.
-  // Multiplicamos por ~1.6 pra dar alcance razoável.
-  return Math.max(-3, Math.min(3, sum * 1.6));
+  return Math.max(-3, Math.min(3, sum * 1.5));
 }
 
 /** Converte o perfil do formulário para o perfil usado pelo motor. */
@@ -100,10 +107,11 @@ export function profileToContext(profile: PlayerProfile): ProfileContext {
   };
 }
 
-function axisAffinity(groupId: string, axes: SliderValues): number {
+function axisAffinity(groupId: string, axes: Record<string, number | undefined>): number {
   return PROFILE_AXES.reduce((sum, axis: ProfileAxis) => {
     const affinity = axis.afinidade[groupId] ?? 0;
-    return sum + (axes[axis.id as keyof SliderValues] * affinity) / 3;
+    const val = axes[axis.id] ?? 0;
+    return sum + (val * affinity) / 3;
   }, 0);
 }
 

@@ -6,7 +6,7 @@ import {
 } from '../../../../game/data/catalog';
 import { GROUPS } from '../../../../game/data/groups';
 import { getIndicator } from '../../../../game/data/indicators';
-import { STATES, type StateId } from '../../../../game/data/states';
+
 import type { AIInterpretation } from '../../../../game/types/ai';
 import { checkOllama } from '../../../../game/services/ai/ollamaClient';
 import { Modal } from './modal';
@@ -71,9 +71,7 @@ function indicatorLabel(id: string): {
   }
 }
 
-function stateLabel(id: string): string {
-  return STATES[id as StateId]?.name ?? id;
-}
+
 
 function areaLabel(id: string): string {
   return AXIS_LABEL[id] ?? id;

@@ -8,9 +8,15 @@ import {
 } from '../game/services/engine/initialState';
 import {
   runGameTurn,
+  recalculateEconomy,
   type TurnLog,
   type TurnSummary,
 } from '../game/services/engine/turn';
+import {
+  indicatorSensitivityDelta,
+  clampApproval,
+  computeNationalApproval,
+} from '../game/services/engine/approval';
 import {
   analyzePolicy,
   createCancellationToken,
@@ -68,6 +74,7 @@ export interface GameStoreState {
   commitPreparedMonth(prepared: PreparedMonth): void;
 
   setIndicatorSlider(indicatorId: string, value: number): void;
+  applyIndicatorChange(indicatorId: string, value: number): boolean;
 
   analyzeProposal(text: string, options?: PolicyAIOptions): Promise<void>;
   cancelAnalysis(): void;
@@ -202,15 +209,68 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   setIndicatorSlider(indicatorId: string, value: number) {
     const { game } = get();
     if (!game) return;
+    const updated = {
+      ...game.nationalIndicators,
+      [indicatorId]: value,
+    };
+    recalculateEconomy(updated);
     set({
       game: {
         ...game,
-        nationalIndicators: {
-          ...game.nationalIndicators,
-          [indicatorId]: value,
-        },
+        nationalIndicators: updated,
       },
     });
+  },
+
+  applyIndicatorChange(indicatorId: string, value: number): boolean {
+    const { game, saveId } = get();
+    if (!game) return false;
+
+    const currentMonthIdx = (game.year - 2026) * 12 + (game.month - 1);
+    if (game.lastModifiedIndicatorMonth === currentMonthIdx) {
+      set({ lastError: 'Você já realizou uma alteração de política/indicador este mês. Aguarde o próximo turno para aplicar outra.' });
+      return false;
+    }
+
+    const updated = {
+      ...game.nationalIndicators,
+      [indicatorId]: value,
+    };
+    recalculateEconomy(updated);
+
+    // Imediatamente calcula a repercussão nos 12 grupos sociais
+    const delta = value - (game.nationalIndicators[indicatorId] ?? value);
+    const updatedApprovals = { ...game.groupApprovals };
+    if (Math.abs(delta) > 0.0001) {
+      const deltas = { national: { [indicatorId]: delta } };
+      for (const [groupId, currentApp] of Object.entries(game.groupApprovals)) {
+        const { delta: groupDelta } = indicatorSensitivityDelta(groupId, deltas);
+        updatedApprovals[groupId] = clampApproval(currentApp + groupDelta);
+      }
+    }
+    const updatedNatApproval = computeNationalApproval(updatedApprovals);
+    updated.aprovacao_popular = updatedNatApproval;
+
+    const updatedGame: GameState = {
+      ...game,
+      nationalIndicators: updated,
+      groupApprovals: updatedApprovals,
+      nationalApproval: updatedNatApproval,
+      lastModifiedIndicatorMonth: currentMonthIdx,
+    };
+
+    set({
+      game: updatedGame,
+      lastError: null,
+    });
+
+    if (saveId !== null && saveManager) {
+      saveManager.autoSave(updatedGame).catch((err) => {
+        console.error('[applyIndicatorChange] Falha no auto-save:', err);
+      });
+    }
+
+    return true;
   },
 
   runMonth() {

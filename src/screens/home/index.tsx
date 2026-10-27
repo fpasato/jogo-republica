@@ -35,13 +35,30 @@ export function Home() {
   const [noticias, setNoticias] = useState<Noticia[]>([]);
 
   const mapStates = STATE_IDS.map((id) => {
+    const state = STATES[id];
     const nat = game?.nationalApproval ?? 50;
-    const inc = STATES[id]?.politicalInclination ?? 0;
-    const govIdeology = game?.profile.govIdeology ?? 0;
-    const shift = -inc * (govIdeology / 3) * 8;
+    const govIdeology = game?.profile.govIdeology ?? 0; // -3 (esquerda) a +3 (direita)
+
+    // Ajuste regional estrutural:
+    // Sul e Sudeste têm histórico mais liberal/conservador (direita)
+    // Norte e Nordeste têm histórico mais trabalhista/redistributivo (esquerda)
+    // Centro-Oeste é fortemente agro/conservador (direita)
+    let regionalLean = 0;
+    if (state.region === 'Sul') regionalLean = 0.55;
+    else if (state.region === 'Sudeste') regionalLean = 0.35;
+    else if (state.region === 'Centro-Oeste') regionalLean = 0.60;
+    else if (state.region === 'Nordeste') regionalLean = -0.65;
+    else if (state.region === 'Norte') regionalLean = -0.20;
+
+    // Combina inclinação específica do estado com o alinhamento regional
+    const totalLean = (state.politicalInclination * 0.5) + (regionalLean * 0.5);
+
+    // Se govIdeology for > 0 (direita): soma no Sul/Sudeste/CO e subtrai no Norte/Nordeste
+    // Se govIdeology for < 0 (esquerda): soma no Norte/Nordeste e subtrai no Sul/Sudeste
+    const shift = (govIdeology / 3) * totalLean * 16;
     const approval = Math.min(100, Math.max(1, nat + shift));
     return {
-      ...STATES[id],
+      ...state,
       approval,
     };
   });

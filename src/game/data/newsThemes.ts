@@ -40,20 +40,15 @@ const CATEGORY_TO_THEME: Record<IndicatorCategory, NewsTheme> = {
   economia: 'economy',
   saude: 'health',
   educacao: 'education',
-  seguranca: 'security',
-  infraestrutura: 'infrastructure',
   social: 'social',
-  ambiente: 'environment',
-  gestao: 'politics',
-  politica: 'politics',
+  seguranca: 'security',
+  energia: 'infrastructure',
+  cultura: 'social',
 };
 
 // ============================================================
 // MACROS → TEMA
 // ============================================================
-// Os 10 macros do catalog.ts não estão em indicators.ts.
-// Precisamos mapear manualmente.
-
 const MACRO_TO_THEME: Record<string, NewsTheme> = {
   unemployment: 'economy',
   growth: 'economy',
@@ -83,7 +78,7 @@ export function themeOf(indicatorId: string): NewsTheme {
   if (macro) return macro;
 
   // Tenta indicador detalhado
-  const ind = INDICATORS[indicatorId];
+  const ind = INDICATORS.find(i => i.id === indicatorId);
   if (ind) return CATEGORY_TO_THEME[ind.category];
 
   return 'politics';

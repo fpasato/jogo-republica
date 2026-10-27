@@ -22,6 +22,7 @@ export interface GameState {
   nationalApproval: number;
   activePolicies: ActivePolicy[];
   policyHistory: { monthIndex: number; id: string }[];
+  lastModifiedIndicatorMonth?: number;
   history: ContextSnapshot[];
 }
 
@@ -42,6 +43,8 @@ export const DEFAULT_PROFILE: ProfileContext = {
     seguranca: -1,
     ambiente: 1,
     gasto_social: 1,
+    trabalho: -1,
+    politica_externa: -1,
   },
 };
 
@@ -57,7 +60,7 @@ export function buildInitialState(opts: InitialStateOptions = {}): GameState {
 
   // 2. Macros
   const macros = initialMacroValues();
-  for (const [k, v] of Object.entries(macros)) {
+  for (const k of Object.keys(macros)) {
     if (nationalIndicators[k] !== undefined) {
       macros[k] = nationalIndicators[k];
     }
@@ -88,6 +91,7 @@ export function buildInitialState(opts: InitialStateOptions = {}): GameState {
     nationalApproval,
     activePolicies: [],
     policyHistory: [],
+    lastModifiedIndicatorMonth: undefined,
     history: [],
   };
 }

@@ -24,7 +24,7 @@ export const GROUPS: GroupDef[] = [
     peso: 60,
     combatividade: 1.2,
     lean: 0.8,
-    initialApproval: 48,
+    initialApproval: 46,
   },
   {
     id: 'progressistas',
@@ -35,7 +35,7 @@ export const GROUPS: GroupDef[] = [
     peso: 55,
     combatividade: 1.2,
     lean: -0.8,
-    initialApproval: 52,
+    initialApproval: 54,
   },
   {
     id: 'liberais_economicos',
@@ -44,9 +44,9 @@ export const GROUPS: GroupDef[] = [
     categoria: 'politico',
     descricao: 'Priorizam mercado, concorrência e menor intervenção estatal. Reagem especialmente a impostos, regulamentações, privatizações e gastos públicos.',
     peso: 65,
-    combatividade: 1.3,
+    combatividade: 1.4,
     lean: 0.9,
-    initialApproval: 45,
+    initialApproval: 39,
   },
   {
     id: 'trabalhistas',
@@ -57,7 +57,7 @@ export const GROUPS: GroupDef[] = [
     peso: 65,
     combatividade: 1.2,
     lean: -0.7,
-    initialApproval: 52,
+    initialApproval: 56,
   },
 
   // --- Grupos demográficos e sociais ---
@@ -68,9 +68,9 @@ export const GROUPS: GroupDef[] = [
     categoria: 'demografico',
     descricao: 'Reagem a emprego, salário mínimo, educação, moradia, transporte e oportunidades profissionais.',
     peso: 50,
-    combatividade: 1.1,
+    combatividade: 1.2,
     lean: -0.2,
-    initialApproval: 50,
+    initialApproval: 51,
   },
   {
     id: 'idosos',
@@ -79,9 +79,9 @@ export const GROUPS: GroupDef[] = [
     categoria: 'demografico',
     descricao: 'Reagem a aposentadorias, inflação, saúde, medicamentos e custo de vida.',
     peso: 60,
-    combatividade: 0.9,
+    combatividade: 1.0,
     lean: 0.3,
-    initialApproval: 50,
+    initialApproval: 47,
   },
   {
     id: 'religiosos',
@@ -92,7 +92,7 @@ export const GROUPS: GroupDef[] = [
     peso: 65,
     combatividade: 1.2,
     lean: 0.6,
-    initialApproval: 48,
+    initialApproval: 44,
   },
   {
     id: 'baixa_renda',
@@ -101,9 +101,9 @@ export const GROUPS: GroupDef[] = [
     categoria: 'demografico',
     descricao: 'Reage a Bolsa Família, salário mínimo, inflação, desemprego, habitação e serviços públicos.',
     peso: 75,
-    combatividade: 1.1,
+    combatividade: 1.2,
     lean: -0.4,
-    initialApproval: 55,
+    initialApproval: 58,
   },
   {
     id: 'classe_media',
@@ -112,9 +112,9 @@ export const GROUPS: GroupDef[] = [
     categoria: 'demografico',
     descricao: 'Reage a imposto de renda, custo de vida, emprego, segurança, educação e saúde.',
     peso: 70,
-    combatividade: 1.2,
+    combatividade: 1.3,
     lean: 0.2,
-    initialApproval: 47,
+    initialApproval: 42,
   },
 
   // --- Grupos de interesses econômicos ---
@@ -125,9 +125,9 @@ export const GROUPS: GroupDef[] = [
     categoria: 'economico',
     descricao: 'Reagem a impostos empresariais, crédito, juros, regulamentação, salários e consumo.',
     peso: 75,
-    combatividade: 1.3,
+    combatividade: 1.4,
     lean: 0.8,
-    initialApproval: 45,
+    initialApproval: 37,
   },
   {
     id: 'agronegocio',
@@ -138,7 +138,7 @@ export const GROUPS: GroupDef[] = [
     peso: 70,
     combatividade: 1.3,
     lean: 0.7,
-    initialApproval: 48,
+    initialApproval: 49,
   },
   {
     id: 'servidores_publicos',
@@ -147,9 +147,9 @@ export const GROUPS: GroupDef[] = [
     categoria: 'economico',
     descricao: 'Reagem a salários, contratação, orçamento público, previdência e reformas administrativas.',
     peso: 60,
-    combatividade: 1.4,
+    combatividade: 1.3,
     lean: -0.5,
-    initialApproval: 50,
+    initialApproval: 53,
   },
 ];
 

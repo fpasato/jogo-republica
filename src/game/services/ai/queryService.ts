@@ -1,7 +1,7 @@
 // src/game/services/ai/queryService.ts
 
-import { INDICATORS_BY_ID, getIndicator } from '../../data/indicators';
-import { GROUPS_BY_ID, getGroup } from '../../data/groups';
+import { INDICATORS_BY_ID } from '../../data/indicators';
+import { GROUPS_BY_ID } from '../../data/groups';
 import { MACRO_BY_ID } from '../../data/macroIndicators';
 import type {
   QueryRequest,

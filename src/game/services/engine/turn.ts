@@ -35,50 +35,69 @@ export interface TurnOutput extends GameState {
 
 // ============================================================
 // SIMULAÇÃO FISCAL E ECONÔMICA DERIVADA
-// ============================================================
-
-function recalculateEconomy(n: Record<string, number>): void {
+export function recalculateEconomy(n: Record<string, number>): void {
   // 1. Receitas do governo estimadas a partir de impostos e PIB
-  // IVA: ~26.5% base gera ~1.3T, IR: ~27.5% gera ~550B, Empresas: ~34% gera ~600B
-  const pibBase = n.pib || 11200e9;
-  const pibRatio = pibBase / 11200e9;
+  // Base nominal do PIB: ~11.2T. Receita primária líquida federal: ~2.45T
+  // Alíquotas base: IVA 26.5% (~1.3T), IR 27.5% (~550B), Empresas 34.0% (~600B)
+  const pibBase = 11200e9;
+  const pibAtual = n.pib || pibBase;
+  const pibRatio = pibAtual / pibBase;
 
-  const recIva = (n.iva / 26.5) * 1300e9 * pibRatio;
-  const recIr = (n.imposto_renda / 27.5) * 550e9 * pibRatio;
-  const recEmpresas = (n.imposto_empresas / 34.0) * 600e9 * pibRatio;
-  n.receitas_governo = recIva + recIr + recEmpresas;
+  // Elasticidade / Efeito Laffer: aumentar alíquotas excessivamente desestimula a base e gera perda de eficiência
+  // Para pequenas variações é quase linear; para variações gigantescas (ex: IVA a 40%) o ganho arrefece.
+  const ivaBase = 26.5;
+  const ivaDiff = (n.iva - ivaBase) / ivaBase;
+  const lafferIvaFactor = 1 - Math.max(0, ivaDiff * 0.35); // se imposto sobe muito, base de consumo diminui
+  const recIva = (1300e9 + 1300e9 * ivaDiff * lafferIvaFactor) * pibRatio;
+
+  const irBase = 27.5;
+  const irDiff = (n.imposto_renda - irBase) / irBase;
+  const lafferIrFactor = 1 - Math.max(0, irDiff * 0.25);
+  const recIr = (550e9 + 550e9 * irDiff * lafferIrFactor) * pibRatio;
+
+  const empBase = 34.0;
+  const empDiff = (n.imposto_empresas - empBase) / empBase;
+  const lafferEmpFactor = 1 - Math.max(0, empDiff * 0.4);
+  const recEmpresas = (600e9 + 600e9 * empDiff * lafferEmpFactor) * pibRatio;
+
+  n.receitas_governo = Math.max(500e9, recIva + recIr + recEmpresas);
 
   // 2. Despesas do governo: soma dos orçamentos e despesas obrigatórias
-  // Base fixa (previdência, custeio, juros): ~1.7T
-  const despesasBase = 1700e9 * pibRatio;
+  // Base fixa (previdência INSS, pensões, custeio fixo, precatórios): ~1.77T
+  const despesasBase = 1770e9 * pibRatio;
+
+  // Salários (impacto na folha do funcionalismo federal/SUS/educação)
+  const folhaSaude = Math.max(0, ((n.salarios_saude || 6800) - 6800) * 12 * 500e3); // componente federal
+  const folhaEducacao = Math.max(0, ((n.salarios_professores || 5200) - 5200) * 12 * 400e3);
+  const auxilioSocialExtra = Math.max(0, ((n.bolsa_familia || 685) - 685) * 12 * 21e6);
+
   const orcamentosDisc =
     (n.orcamento_saude || 218e9) +
     (n.orcamento_educacao || 175e9) +
     (n.orcamento_assistencia_social || 168e9) +
+    auxilioSocialExtra +
     (n.orcamento_seguranca || 42e9) +
     (n.investimento_publico || 85e9) +
     (n.investimento_energia || 35e9) +
-    (n.orcamento_cultura || 3.5e9);
+    (n.orcamento_cultura || 3.5e9) +
+    folhaSaude +
+    folhaEducacao;
 
-  n.despesas_governo = despesasBase + orcamentosDisc;
+  n.despesas_governo = Math.max(500e9, despesasBase + orcamentosDisc);
 
-  // 3. Saldo orçamentário
+  // 3. Saldo orçamentário anualizado
   n.saldo_orcamentario = n.receitas_governo - n.despesas_governo;
 
-  // 4. Dívida pública (acumula déficit / superávit mensalmente)
-  // Déficit mensal = (Despesas - Receitas) / 12
-  const deficitMensal = (n.despesas_governo - n.receitas_governo) / 12;
-  n.divida_publica = Math.max(0, (n.divida_publica || 8900e9) + deficitMensal);
+  // 4. Inflação: afetada por Selic, déficit público, câmbio e impostos sobre consumo (IVA)
+  const selicEfeito = ((11.25 - (n.taxa_selic || 11.25)) * 0.15);
+  const fiscalEfeito = (n.saldo_orcamentario < 0 ? (Math.abs(n.saldo_orcamentario) / 1e12) * 0.5 : -0.15);
+  const ivaRepasse = ((n.iva - 26.5) * 0.18); // repasse de preços ao consumidor
+  n.inflacao = Math.max(0.5, Math.min(30, 4.2 + selicEfeito + fiscalEfeito + ivaRepasse));
 
-  // 5. Inflação: afetada por Selic, déficit público e câmbio
-  const selicEfeito = ((11.25 - (n.taxa_selic || 11.25)) * 0.15); // juros mais baixos aquecem inflação
-  const fiscalEfeito = (n.saldo_orcamentario < 0 ? Math.abs(n.saldo_orcamentario) / 1e12 * 0.4 : -0.1);
-  n.inflacao = Math.max(0.5, Math.min(30, 4.2 + selicEfeito + fiscalEfeito));
-
-  // 6. Crescimento do PIB: impulsionado por investimento e juros baixos, freado por impostos altos
-  const investImpact = (((n.investimento_publico || 85e9) - 85e9) / 85e9) * 0.8;
-  const jurosImpact = ((11.25 - (n.taxa_selic || 11.25)) * 0.2);
-  const tributoImpact = (((n.iva + n.imposto_empresas) - 60.5) * -0.05);
+  // 5. Crescimento do PIB: impulsionado por investimento e juros baixos, freado por carga tributária
+  const investImpact = (((n.investimento_publico || 85e9) - 85e9) / 85e9) * 0.7;
+  const jurosImpact = ((11.25 - (n.taxa_selic || 11.25)) * 0.18);
+  const tributoImpact = (((n.iva + n.imposto_empresas) - 60.5) * -0.06);
   n.crescimento_pib = Math.max(-10, Math.min(10, 2.5 + investImpact + jurosImpact + tributoImpact));
 
   // 7. PIB nominal atualizado com crescimento
