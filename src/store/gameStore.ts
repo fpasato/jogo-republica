@@ -41,7 +41,7 @@ export interface PreparedMonth {
   summary: TurnSummary;
 }
 
-export type GameScreen = 'dashboard' | 'politicas';
+export type GameScreen = 'dashboard' | 'politicas' | 'pais';
 
 export interface GameStoreState {
   game: GameState | null;

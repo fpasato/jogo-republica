@@ -2,6 +2,7 @@ import { useGameStore } from './store/gameStore';
 import { Menu } from './screens/menu';
 import { Home } from './screens/home';
 import { Politicas } from './screens/politicas';
+import { Pais } from './screens/pais';
 
 export default function App() {
   const game = useGameStore((state) => state.game);
@@ -13,7 +14,9 @@ export default function App() {
 
   return (
     <main>
-      {currentScreen === 'dashboard' ? <Home /> : <Politicas />}
+      {currentScreen === 'dashboard' && <Home />}
+      {currentScreen === 'politicas' && <Politicas />}
+      {currentScreen === 'pais' && <Pais />}
     </main>
   );
 }

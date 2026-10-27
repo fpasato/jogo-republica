@@ -62,6 +62,13 @@ export function Header({ onBackToMenu }: HeaderProps) {
                 >
                     Políticas
                 </button>
+                <button
+                    type="button"
+                    className={`${styles.navLink} ${currentScreen === 'pais' ? styles.active : ''}`}
+                    onClick={() => setScreen('pais')}
+                >
+                    País
+                </button>
             </nav>
         </header>
     );
