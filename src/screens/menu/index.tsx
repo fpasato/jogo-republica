@@ -38,13 +38,13 @@ export function Menu({ onStartGame }: { onStartGame?: () => void }) {
                         return {
                             ...save,
                             prevInflation:
-                                (save.game.macros.inflation ?? 0) - (prev.macros.inflation ?? 0),
+                                (save.game?.macros?.inflation ?? 0) - (prev.macros.inflation ?? 0),
                             prevGrowth:
-                                (save.game.macros.growth ?? 0) - (prev.macros.growth ?? 0),
+                                (save.game?.macros?.growth ?? 0) - (prev.macros.growth ?? 0),
                             prevApproval:
-                                save.game.nationalApproval - prev.nationalApproval,
+                                (save.game?.nationalApproval ?? 0) - prev.nationalApproval,
                             prevUnemployment:
-                                (save.game.macros.unemployment ?? 0) - (prev.macros.unemployment ?? 0),
+                                (save.game?.macros?.unemployment ?? 0) - (prev.macros.unemployment ?? 0),
                         };
                     }
                 }
@@ -130,23 +130,23 @@ export function Menu({ onStartGame }: { onStartGame?: () => void }) {
                                     <div className={styles.statsGrid}>
                                         <Stat
                                             label="Aprovação"
-                                            value={`${Math.round(save.game.nationalApproval)} pts`}
+                                            value={`${Math.round(save.game?.nationalApproval ?? 0)} pts`}
                                             diff={save.prevApproval}
                                             unit="pts"
                                         />
                                         <Stat
                                             label="Inflação"
-                                            value={`${(save.game.macros.inflation ?? 0).toFixed(1)}%`}
+                                            value={`${(save.game?.macros?.inflation ?? 0).toFixed(1)}%`}
                                             diff={save.prevInflation}
                                         />
                                         <Stat
                                             label="Desemprego"
-                                            value={`${(save.game.macros.unemployment ?? 0).toFixed(1)}%`}
+                                            value={`${(save.game?.macros?.unemployment ?? 0).toFixed(1)}%`}
                                             diff={save.prevUnemployment}
                                         />
                                         <Stat
                                             label="Crescimento"
-                                            value={`${(save.game.macros.growth ?? 0).toFixed(1)}%`}
+                                            value={`${(save.game?.macros?.growth ?? 0).toFixed(1)}%`}
                                             diff={save.prevGrowth}
                                         />
                                     </div>

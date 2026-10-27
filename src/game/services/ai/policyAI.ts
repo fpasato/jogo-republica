@@ -439,11 +439,9 @@ async function callOllama(payload: PromptPayload, opts: CallOpts) {
 function contextToQueryState(input: ContextInput): QueryState {
   return {
     month: input.month,
-    stateIndicators: input.stateIndicators,
     nationalIndicators: input.nationalIndicators,
     macros: input.macros,
     groupApprovals: input.groupApprovals,
-    stateApprovals: input.stateApprovals,
     activePolicies: input.activePolicies,
     history: input.history,
   };

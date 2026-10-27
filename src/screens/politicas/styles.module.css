@@ -1,0 +1,395 @@
+/* Politicas/styles.module.css — Paleta "Neon Grid" (dark #000) */
+
+.container {
+  background: var(--bg-void);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "tnum" 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.panel {
+  --bg-void: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-elevated: #141414;
+  --border: #262626;
+  --border-strong: #3a3a3a;
+  --text: #f5f5f5;
+  --text-muted: #8a8a8a;
+  --text-dim: #5a5a5a;
+
+  --green-500: #22c55e;
+  --green-400: #4ade80;
+  --green-300: #86efac;
+  --green-900: #052e16;
+
+  --yellow-500: #facc15;
+  --yellow-400: #fde047;
+  --yellow-300: #fef08a;
+  --yellow-900: #422006;
+
+  --blue-500: #3b82f6;
+  --blue-400: #60a5fa;
+  --blue-300: #93c5fd;
+  --blue-900: #172554;
+
+  background: var(--bg-void);
+  color: var(--text);
+  border: 1px solid var(--border);
+  flex: 1;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ═══════════ Tabs ═══════════ */
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tabBtn {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 14px 18px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  position: relative;
+  transition: color 140ms ease, background-color 140ms ease;
+  white-space: nowrap;
+}
+
+.tabBtn:hover {
+  color: var(--text);
+  background: var(--bg-elevated);
+}
+
+.tabBtn:focus-visible {
+  outline: 2px solid var(--blue-400);
+  outline-offset: -2px;
+}
+
+.tabBtn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 2px;
+  background: var(--green-500);
+  transition: width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tabBtn:hover::after {
+  width: 100%;
+}
+
+.activeTab {
+  color: var(--text);
+  background: var(--bg-elevated);
+}
+
+.activeTab::after {
+  width: 100%;
+}
+
+.groupsTab {
+  margin-left: auto;
+  border-right: none;
+  border-left: 1px solid var(--border);
+  color: var(--yellow-400);
+}
+
+.groupsTab:hover::after,
+.groupsTab.activeTab::after {
+  background: var(--yellow-500);
+}
+
+/* ═══════════ Panel content ═══════════ */
+
+.panelContent {
+  padding: 24px;
+  background: var(--bg-void);
+}
+
+/* ═══════════ Grid de grupos ═══════════ */
+
+.groupsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+
+.groupCard {
+  background: var(--bg-surface);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: background-color 160ms ease;
+}
+
+.groupCard:hover {
+  background: var(--bg-elevated);
+}
+
+.groupCard::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--blue-500);
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.groupBadge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  color: var(--blue-400);
+}
+
+/* variantes por categoria (se `data-cat` existir) */
+.groupBadge[data-cat="economia"],
+.groupBadge[data-cat="economico"],
+.groupBadge[data-cat="econômico"] {
+  color: var(--yellow-400);
+}
+
+.groupBadge[data-cat="social"] {
+  color: var(--green-400);
+}
+
+.groupBadge[data-cat="politica"],
+.groupBadge[data-cat="politico"],
+.groupBadge[data-cat="política"],
+.groupBadge[data-cat="político"] {
+  color: var(--blue-400);
+}
+
+.groupInfluence {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+.groupDesc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.groupApprovalRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.approvalBarWrapper {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-void);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.approvalBarFill {
+  height: 100%;
+  transition: width 400ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 200ms ease;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.15);
+}
+
+.approvalValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  font-feature-settings: "tnum" 1;
+  min-width: 48px;
+  text-align: right;
+}
+
+/* ═══════════ Trend (variação) ═══════════ */
+
+.trend {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trend[data-direction="good"],
+.trend[data-direction="positive"],
+.trend[data-direction="up"] {
+  color: var(--green-400);
+}
+
+.trend[data-direction="bad"],
+.trend[data-direction="negative"],
+.trend[data-direction="down"],
+.trend[data-direction="warning"] {
+  color: var(--yellow-400);
+}
+
+.trend[data-direction="neutral"] {
+  color: var(--text-dim);
+}
+
+/* ═══════════ Grid de indicadores ═══════════ */
+
+.indicatorsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+
+.item {
+  background: var(--bg-surface);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  transition: background-color 160ms ease;
+}
+
+.item:hover {
+  background: var(--bg-elevated);
+}
+
+.item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--green-500);
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.typeTag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  color: var(--text-dim);
+}
+
+.typeTag[data-type="slider"] {
+  color: var(--yellow-400);
+}
+
+.typeTag[data-type="calculated"],
+.typeTag[data-type="calculado"] {
+  color: var(--blue-400);
+}
+
+.value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  font-feature-settings: "tnum" 1;
+  line-height: 1;
+}
+
+.value[data-balance="positive"] {
+  color: var(--green-400);
+}
+
+.value[data-balance="negative"] {
+  color: var(--yellow-400);
+}
+
+.value[data-balance="neutral"] {
+  color: var(--text);
+}
+
+.label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.metricDesc {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ═══════════ Responsivo ═══════════ */
+
+@media (max-width: 720px) {
+  .panelContent {
+    padding: 16px;
+  }
+
+  .groupsGrid,
+  .indicatorsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .groupsTab {
+    margin-left: 0;
+    border-left: none;
+  }
+}

@@ -1,298 +1,174 @@
-import { PROFILE_AXES, GROUP_LEAN } from './profile';
-
-// ============================================================
-// TIPOS
-// ============================================================
-
-export interface MonthlyEffects {
-  grupos?: Record<string, number>;
-  indicadores?: Record<string, number>;
-}
-
-export interface ReactionDef {
-  titulo: string;
-  efeito: string;
-  mensal: MonthlyEffects;
-}
-
-export interface GroupEixos {
-  economia: number;
-  costumes: number;
-  seguranca: number;
-  ambiente: number;
-  gasto_social: number;
-}
+// src/game/data/groups.ts
+// 12 Grupos políticos, demográficos e de interesses econômicos
 
 export interface GroupDef {
   id: string;
   nome: string;
   curto: string;
-  peso: number;
+  categoria: 'politico' | 'demografico' | 'economico';
+  descricao: string;
+  peso: number; // Influência política base (0 a 100)
   combatividade: number;
-  /** Lean geral -1..+1 (do GROUP_LEAN). */
-  lean: number;
-  /** Afinidade normalizada por eixo, -1..+1 (do PROFILE_AXES). */
-  eixos: GroupEixos;
-  /** Aprovação abaixo da qual a reação dispara. Default 35. */
-  limiarReacao: number;
-  reacao?: ReactionDef;
+  lean: number; // -1 (esquerda) a +1 (direita)
+  initialApproval: number;
 }
 
-// ============================================================
-// NORMALIZAÇÃO DE AFINIDADE
-// ============================================================
-// PROFILE_AXES.afinidade vai de -4 a +4 por grupo. Normalizamos
-// para -1..+1 dividindo por 4. Assim `eixos` tem a mesma escala
-// de `lean` e é mais fácil de multiplicar no motor.
+export const GROUPS: GroupDef[] = [
+  // --- Grupos políticos e ideológicos ---
+  {
+    id: 'conservadores',
+    nome: 'Conservadores',
+    curto: 'conservadores',
+    categoria: 'politico',
+    descricao: 'Valorizam tradição, ordem social e continuidade de instituições. Reagem a políticas culturais, educacionais, tributárias e de segurança.',
+    peso: 60,
+    combatividade: 1.2,
+    lean: 0.8,
+    initialApproval: 48,
+  },
+  {
+    id: 'progressistas',
+    nome: 'Progressistas',
+    curto: 'progressistas',
+    categoria: 'politico',
+    descricao: 'Priorizam mudanças sociais, direitos civis e redução de desigualdades. Reagem a políticas de assistência social, educação e cultura.',
+    peso: 55,
+    combatividade: 1.2,
+    lean: -0.8,
+    initialApproval: 52,
+  },
+  {
+    id: 'liberais_economicos',
+    nome: 'Liberais econômicos',
+    curto: 'liberais',
+    categoria: 'politico',
+    descricao: 'Priorizam mercado, concorrência e menor intervenção estatal. Reagem especialmente a impostos, regulamentações, privatizações e gastos públicos.',
+    peso: 65,
+    combatividade: 1.3,
+    lean: 0.9,
+    initialApproval: 45,
+  },
+  {
+    id: 'trabalhistas',
+    nome: 'Trabalhistas e social-democratas',
+    curto: 'trabalhistas',
+    categoria: 'politico',
+    descricao: 'Priorizam direitos trabalhistas, proteção social e serviços públicos. Reagem a salários, benefícios, impostos e investimentos sociais.',
+    peso: 65,
+    combatividade: 1.2,
+    lean: -0.7,
+    initialApproval: 52,
+  },
 
-const AFFINITY_MAX = 4;
+  // --- Grupos demográficos e sociais ---
+  {
+    id: 'jovens',
+    nome: 'Jovens',
+    curto: 'jovens',
+    categoria: 'demografico',
+    descricao: 'Reagem a emprego, salário mínimo, educação, moradia, transporte e oportunidades profissionais.',
+    peso: 50,
+    combatividade: 1.1,
+    lean: -0.2,
+    initialApproval: 50,
+  },
+  {
+    id: 'idosos',
+    nome: 'Idosos',
+    curto: 'idosos',
+    categoria: 'demografico',
+    descricao: 'Reagem a aposentadorias, inflação, saúde, medicamentos e custo de vida.',
+    peso: 60,
+    combatividade: 0.9,
+    lean: 0.3,
+    initialApproval: 50,
+  },
+  {
+    id: 'religiosos',
+    nome: 'Religiosos',
+    curto: 'religiosos',
+    categoria: 'demografico',
+    descricao: 'Reagem a políticas relacionadas a valores morais, educação, assistência social e liberdade religiosa.',
+    peso: 65,
+    combatividade: 1.2,
+    lean: 0.6,
+    initialApproval: 48,
+  },
+  {
+    id: 'baixa_renda',
+    nome: 'População de baixa renda',
+    curto: 'baixa renda',
+    categoria: 'demografico',
+    descricao: 'Reage a Bolsa Família, salário mínimo, inflação, desemprego, habitação e serviços públicos.',
+    peso: 75,
+    combatividade: 1.1,
+    lean: -0.4,
+    initialApproval: 55,
+  },
+  {
+    id: 'classe_media',
+    nome: 'Classe média',
+    curto: 'classe média',
+    categoria: 'demografico',
+    descricao: 'Reage a imposto de renda, custo de vida, emprego, segurança, educação e saúde.',
+    peso: 70,
+    combatividade: 1.2,
+    lean: 0.2,
+    initialApproval: 47,
+  },
 
-function buildEixos(groupId: string): GroupEixos {
-  const out: GroupEixos = {
-    economia: 0, costumes: 0, seguranca: 0, ambiente: 0, gasto_social: 0,
-  };
-  for (const axis of PROFILE_AXES) {
-    const raw = axis.afinidade[groupId] ?? 0;
-    const normalized = raw / AFFINITY_MAX;
-    if (axis.id === 'gasto_social') out.gasto_social = normalized;
-    else if (axis.id === 'economia') out.economia = normalized;
-    else if (axis.id === 'costumes') out.costumes = normalized;
-    else if (axis.id === 'seguranca') out.seguranca = normalized;
-    else if (axis.id === 'ambiente') out.ambiente = normalized;
-  }
-  return out;
-}
-
-// ============================================================
-// DEFINIÇÃO BRUTA (idêntica ao catalog.ts atual)
-// ============================================================
-// Mantido intencionalmente próximo do original para facilitar diff.
-
-type RawGroup = {
-  id: string;
-  nome: string;
-  curto: string;
-  peso: number;
-  combatividade?: number;
-  reacao?: ReactionDef;
-};
-
-const RAW: RawGroup[] = [
+  // --- Grupos de interesses econômicos ---
   {
-    id: 'empresarios', nome: 'Empresários', curto: 'empresários', peso: 6,
-    reacao: {
-      titulo: 'cartas de entidades patronais e freio nos investimentos',
-      efeito: 'Enquanto durar, o investimento esfria e o crescimento sofre.',
-      mensal: { grupos: { empresarios: -1.5 }, indicadores: { growth: -0.1 } },
-    },
+    id: 'empresarios',
+    nome: 'Empresários',
+    curto: 'empresários',
+    categoria: 'economico',
+    descricao: 'Reagem a impostos empresariais, crédito, juros, regulamentação, salários e consumo.',
+    peso: 75,
+    combatividade: 1.3,
+    lean: 0.8,
+    initialApproval: 45,
   },
   {
-    id: 'trabalhadores', nome: 'Trabalhadores e sindicalistas', curto: 'trabalhadores e sindicalistas', peso: 16, combatividade: 1.1,
-    reacao: {
-      titulo: 'greve geral e atos das centrais sindicais',
-      efeito: 'Enquanto durar, a produção cai e a rua esquenta.',
-      mensal: { grupos: { trabalhadores: -1.5 }, indicadores: { growth: -0.1, crisisClimate: 1.2 } },
-    },
+    id: 'agronegocio',
+    nome: 'Agronegócio',
+    curto: 'agronegócio',
+    categoria: 'economico',
+    descricao: 'Reage a crédito rural, impostos, exportações, infraestrutura, energia e regulamentação ambiental.',
+    peso: 70,
+    combatividade: 1.3,
+    lean: 0.7,
+    initialApproval: 48,
   },
   {
-    id: 'conservadores', nome: 'Conservadores', curto: 'conservadores', peso: 9,
-    reacao: {
-      titulo: 'atos de rua e campanha nas redes',
-      efeito: 'Enquanto durar, a oposição se mobiliza e a imagem do governo sofre.',
-      mensal: { grupos: { conservadores: -1.5 }, indicadores: { scandalExposure: 0.8, crisisClimate: 0.6 } },
-    },
-  },
-  {
-    id: 'religiosos', nome: 'Religiosos e evangélicos', curto: 'religiosos e evangélicos', peso: 9,
-    reacao: {
-      titulo: 'mobilização em igrejas e pressão sobre parlamentares',
-      efeito: 'Enquanto durar, a bancada religiosa endurece com o governo.',
-      mensal: { grupos: { religiosos: -1.5, conservadores: -0.5 }, indicadores: { crisisClimate: 0.6 } },
-    },
-  },
-  {
-    id: 'progressistas', nome: 'Progressistas', curto: 'progressistas', peso: 9,
-    reacao: {
-      titulo: 'atos de rua e campanha nas redes',
-      efeito: 'Enquanto durar, a base do governo se desgasta e a imagem sofre.',
-      mensal: { grupos: { progressistas: -1.5 }, indicadores: { scandalExposure: 0.8 } },
-    },
-  },
-  {
-    id: 'socialistas', nome: 'Socialistas e comunistas', curto: 'socialistas e comunistas', peso: 2,
-    reacao: {
-      titulo: 'ocupações e atos de movimentos sociais',
-      efeito: 'Enquanto durar, os movimentos sociais ocupam a pauta e o clima esquenta.',
-      mensal: { grupos: { socialistas: -1.5 }, indicadores: { crisisClimate: 0.8 } },
-    },
-  },
-  {
-    id: 'mercado_financeiro', nome: 'Mercado financeiro', curto: 'mercado financeiro', peso: 3,
-    reacao: {
-      titulo: 'fuga de capitais e pressão sobre o dólar',
-      efeito: 'Enquanto durar, o dólar sobe e o crédito encarece.',
-      mensal: { grupos: { mercado_financeiro: -1.5 }, indicadores: { dollar: 1.5 } },
-    },
-  },
-  {
-    id: 'servidores_publicos', nome: 'Servidores públicos', curto: 'servidores públicos', peso: 6,
-    reacao: {
-      titulo: 'greve do funcionalismo e atos em Brasília',
-      efeito: 'Enquanto durar, serviços públicos travam e o desgaste cresce.',
-      mensal: { grupos: { servidores_publicos: -1.5 }, indicadores: { crisisClimate: 0.8, scandalExposure: 0.5 } },
-    },
-  },
-  {
-    id: 'agronegocio', nome: 'Agronegócio exportador', curto: 'agronegócio exportador', peso: 5,
-    reacao: {
-      titulo: 'pressão da bancada ruralista e tratoraço',
-      efeito: 'Enquanto durar, a bancada ruralista endurece no Congresso.',
-      mensal: { grupos: { agronegocio: -1.5 }, indicadores: { crisisClimate: 0.6 } },
-    },
-  },
-  {
-    id: 'jovens', nome: 'Jovens', curto: 'jovens', peso: 10,
-    reacao: {
-      titulo: 'protestos de rua e engajamento nas redes',
-      efeito: 'Enquanto durar, a imagem do governo apanha entre os jovens e na internet.',
-      mensal: { grupos: { jovens: -1.5 }, indicadores: { scandalExposure: 1 } },
-    },
-  },
-  {
-    id: 'aposentados', nome: 'Aposentados', curto: 'aposentados', peso: 8,
-    reacao: {
-      titulo: 'pressão de associações sobre o Congresso',
-      efeito: 'Enquanto durar, parlamentares são cobrados e o desgaste aumenta.',
-      mensal: { grupos: { aposentados: -1.5 }, indicadores: { crisisClimate: 0.5 } },
-    },
-  },
-  {
-    id: 'militares', nome: 'Militares', curto: 'militares', peso: 1.5,
-    reacao: {
-      titulo: 'notas de comandantes e mal-estar nos quartéis',
-      efeito: 'Enquanto durar, a lealdade militar despenca.',
-      mensal: { grupos: { militares: -2 }, indicadores: { militaryLoyalty: -3, crisisClimate: 1 } },
-    },
-  },
-  {
-    id: 'policiais', nome: 'Policiais e praças', curto: 'policiais e praças', peso: 3.5,
-    reacao: {
-      titulo: 'operação-padrão e ameaça de aquartelamento',
-      efeito: 'Enquanto durar, mal-estar nos quartéis e a lealdade militar cai.',
-      mensal: {
-        grupos: { policiais: -2 },
-        indicadores: { scandalExposure: 0.8, militaryLoyalty: -2.4, crisisClimate: 0.6 },
-      },
-    },
-  },
-  {
-    id: 'universitarios', nome: 'Universitários', curto: 'universitários', peso: 4,
-    reacao: {
-      titulo: 'ocupação de reitorias e cartas de pesquisadores',
-      efeito: 'Enquanto durar, ocupações viram manchete e o conflito no campo cresce.',
-      mensal: { grupos: { universitarios: -1, ciencia: -1 }, indicadores: { scandalExposure: 1.4 } },
-    },
-  },
-  {
-    id: 'ciencia', nome: 'Ciência e universidade pública', curto: 'ciência e universidade pública', peso: 1.5,
-    reacao: {
-      titulo: 'cartas de pesquisadores e paralisação de laboratórios',
-      efeito: 'Enquanto durar, a comunidade científica fica contra o governo.',
-      mensal: { grupos: { ciencia: -1.4, universitarios: -0.5 }, indicadores: { scandalExposure: 0.8 } },
-    },
-  },
-  {
-    id: 'artistas', nome: 'Artistas e cultura', curto: 'artistas e cultura', peso: 1.5, combatividade: 1.05,
-    reacao: {
-      titulo: 'carta aberta de artistas e campanha nas redes',
-      efeito: 'Enquanto durar, a imagem do governo apanha com os jovens e a internet, e a exposição sobe.',
-      mensal: {
-        grupos: { artistas: -1.6, jovens: -0.6, universitarios: -0.6 },
-        indicadores: { scandalExposure: 1.6 },
-      },
-    },
-  },
-  {
-    id: 'feministas', nome: 'Feministas', curto: 'feministas', peso: 2,
-    reacao: {
-      titulo: 'atos nacionais e campanha internacional',
-      efeito: 'Enquanto durar, a pauta ganha as redes e a exposição sobe.',
-      mensal: { grupos: { feministas: -1.5, progressistas: -0.4 }, indicadores: { scandalExposure: 1 } },
-    },
-  },
-  {
-    id: 'lgbtqia', nome: 'LGBTQIA+', curto: 'LGBTQIA+', peso: 2,
-    reacao: {
-      titulo: 'atos nacionais e campanha internacional',
-      efeito: 'Enquanto durar, a pauta ganha as redes e a exposição sobe.',
-      mensal: { grupos: { lgbtqia: -1.5, progressistas: -0.4 }, indicadores: { scandalExposure: 1 } },
-    },
-  },
-  {
-    id: 'movimento_negro', nome: 'Movimento negro', curto: 'movimento negro', peso: 6,
-    reacao: {
-      titulo: 'atos nacionais e mobilização de entidades',
-      efeito: 'Enquanto durar, a pauta racial ganha as ruas e as redes e a exposição sobe.',
-      mensal: { grupos: { movimento_negro: -1.5, progressistas: -0.4 }, indicadores: { scandalExposure: 1, crisisClimate: 0.5 } },
-    },
-  },
-  {
-    id: 'povos_indigenas', nome: 'Povos indígenas', curto: 'povos indígenas', peso: 1,
-    reacao: {
-      titulo: 'mobilização em Brasília e denúncia internacional',
-      efeito: 'Enquanto durar, a pauta ganha repercussão internacional e a exposição sobe.',
-      mensal: { grupos: { povos_indigenas: -1.5, progressistas: -0.3 }, indicadores: { scandalExposure: 1.2 } },
-    },
+    id: 'servidores_publicos',
+    nome: 'Servidores públicos',
+    curto: 'servidores públicos',
+    categoria: 'economico',
+    descricao: 'Reagem a salários, contratação, orçamento público, previdência e reformas administrativas.',
+    peso: 60,
+    combatividade: 1.4,
+    lean: -0.5,
+    initialApproval: 50,
   },
 ];
 
-// ============================================================
-// BUILD FINAL
-// ============================================================
-
-const DEFAULT_LIMIAR = 35;
-
-export const GROUPS: GroupDef[] = RAW.map((g) => ({
-  id: g.id,
-  nome: g.nome,
-  curto: g.curto,
-  peso: g.peso,
-  combatividade: g.combatividade ?? 1,
-  lean: GROUP_LEAN[g.id] ?? 0,
-  eixos: buildEixos(g.id),
-  limiarReacao: DEFAULT_LIMIAR,
-  reacao: g.reacao,
-}));
-
-export const GROUP_BY_ID: Record<string, GroupDef> = Object.fromEntries(
-  GROUPS.map((g) => [g.id, g]),
-);
-
-export const GROUP_IDS = GROUPS.map((g) => g.id);
+export const GROUPS_BY_ID = Object.fromEntries(GROUPS.map((g) => [g.id, g])) as Record<string, GroupDef>;
 
 export function getGroup(id: string): GroupDef {
-  const g = GROUP_BY_ID[id];
-  if (!g) throw new Error(`Grupo desconhecido: ${id}`);
-  return g;
-}
-
-export function hasGroup(id: string): boolean {
-  return id in GROUP_BY_ID;
-}
-
-/**
- * Aprovação nacional ponderada pelos pesos dos grupos.
- * Substitui o antigo nationalApprovalFromGroups do profileService.
- */
-export function nationalApprovalFromGroups(
-  groupApprovals: Record<string, number>,
-): number {
-  let num = 0, den = 0;
-  for (const g of GROUPS) {
-    const v = groupApprovals[g.id];
-    if (v === undefined) continue;
-    num += v * g.peso;
-    den += g.peso;
+  const g = GROUPS_BY_ID[id];
+  if (!g) {
+    return {
+      id,
+      nome: id,
+      curto: id,
+      categoria: 'politico',
+      descricao: '',
+      peso: 50,
+      combatividade: 1,
+      lean: 0,
+      initialApproval: 50,
+    };
   }
-  return den === 0 ? 50 : num / den;
+  return g;
 }

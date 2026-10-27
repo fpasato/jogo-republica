@@ -1,18 +1,32 @@
 /* ============================================================
-   NEWS HOME — Jornal impresso (papel + tinta)
+   NEWS HOME — Jornal impresso dark ("Jornal da Meia-Noite")
+   Paleta "Neon Grid": #000 + verde / amarelo / azul
+   Estilo jornal editorial com textura de papel
    ============================================================ */
 
 .container {
-  /* Paleta de papel e tinta — local ao componente */
-  --paper:        #f4ecd8;   /* papel jornal envelhecido */
-  --paper-2:      #ebe1c8;   /* papel sombreado */
-  --paper-edge:   #d8ccae;   /* borda do papel */
-  --ink:          #1a1815;   /* tinta preta */
-  --ink-soft:     #3a352c;   /* tinta esmaecida */
-  --ink-faint:    #6b6353;   /* tinta fraca */
-  --rule:         #2a2620;   /* filete preto */
-  --rule-soft:    #a89c7c;   /* filete fino */
-  --stamp:        #8a1c1c;   /* vermelho de manchete/urgente */
+  /* Base dark */
+  --bg-void:       #000000;
+  --paper:         #0a0a0a;   /* "papel" escuro — superfície do jornal */
+  --paper-2:       #141414;   /* papel sombreado / faixa */
+  --paper-edge:    #262626;   /* borda do papel */
+
+  /* Tinta (ink) — clara */
+  --ink:           #f5f5f5;   /* tinta principal */
+  --ink-soft:      #c4c4c4;   /* tinta esmaecida */
+  --ink-faint:     #8a8a8a;   /* tinta fraca */
+
+  /* Filetes (rules) */
+  --rule:          #3a3a3a;   /* filete forte */
+  --rule-soft:     #1f1f1f;   /* filete fino */
+
+  /* Accents Neon Grid */
+  --green-500:     #22c55e;
+  --green-400:     #4ade80;
+  --yellow-500:    #facc15;
+  --yellow-400:    #fde047;
+  --blue-500:      #3b82f6;
+  --blue-400:      #60a5fa;
 
   display: flex;
   flex-direction: column;
@@ -20,19 +34,22 @@
   padding: 28px 26px;
   background: var(--paper);
   border: 1px solid var(--paper-edge);
-  border-radius: 4px;
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.04) inset,
-    0 10px 28px rgba(2, 6, 15, 0.55);
-  /* leve textura de papel */
-  background-image:
-    radial-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
-    radial-gradient(rgba(0, 0, 0, 0.015) 1px, transparent 1px);
-  background-size: 3px 3px, 7px 7px;
-  background-position: 0 0, 2px 2px;
   color: var(--ink);
   font-family: 'Georgia', 'Times New Roman', 'Iowan Old Style', serif;
   font-feature-settings: 'kern', 'liga', 'onum';
+
+  /* ─── Textura de papel dark ───
+     Duas camadas de grão branco muito sutil sobre o preto,
+     simulando a fibra do papel jornal impresso.
+     (Levemente visível em telas com bom contraste.) */
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, 0.010) 1px, transparent 1px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 2px 2px;
+
+  /* Sombra interna sutil pra dar profundidade de impressão */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 /* ============================================================
@@ -46,17 +63,32 @@
   gap: 12px;
   flex-wrap: wrap;
   padding-bottom: 10px;
-  border-bottom: 3px double var(--rule);
   position: relative;
 }
 
-/* Fio duplo abaixo do título (assinatura de jornal) */
+/* Fio duplo em gradiente neon — assinatura de jornal */
+.header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--green-500),
+    var(--yellow-500),
+    var(--blue-500)
+  );
+}
+
+/* Filete fino abaixo, imitando a fita dupla do jornal */
 .header::after {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -8px;
+  bottom: -6px;
   height: 1px;
   background: var(--rule-soft);
 }
@@ -68,7 +100,7 @@
   font-weight: 700;
   letter-spacing: 0.32em;
   text-transform: uppercase;
-  color: var(--stamp);
+  color: var(--blue-400);
 }
 
 .header h2 {
@@ -80,6 +112,7 @@
   letter-spacing: -0.015em;
   color: var(--ink);
   text-transform: uppercase;
+  text-shadow: 0 0 24px rgba(34, 197, 94, 0.12);
 }
 
 .status {
@@ -88,11 +121,10 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--stamp);
+  color: var(--yellow-400);
   padding: 3px 8px;
   background: transparent;
-  border: 1px solid var(--stamp);
-  border-radius: 2px;
+  border: 1px solid var(--yellow-500);
 }
 
 /* ============================================================
@@ -104,11 +136,10 @@
   padding: 10px 12px;
   font-size: 0.85rem;
   line-height: 1.45;
-  color: var(--stamp);
-  background: rgba(138, 28, 28, 0.06);
-  border: 1px solid var(--stamp);
+  color: var(--yellow-300, #fef08a);
+  background: rgba(250, 204, 21, 0.04);
+  border: 1px solid var(--yellow-500);
   border-left-width: 4px;
-  border-radius: 2px;
 }
 
 .empty {
@@ -120,8 +151,7 @@
   font-size: 1rem;
   color: var(--ink-faint);
   background: var(--paper-2);
-  border: 1px dashed var(--rule-soft);
-  border-radius: 2px;
+  border: 1px dashed var(--rule);
 }
 
 /* ============================================================
@@ -150,6 +180,8 @@
 .article:first-child {
   grid-template-columns: 1fr;
   gap: 14px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--rule-soft);
 }
 
 .article:first-child .image {
@@ -163,22 +195,29 @@
 }
 
 /* ============================================================
-   IMAGEM — foto de jornal
+   IMAGEM — foto de jornal impresso em dark
    ============================================================ */
 
 .image {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: 2px;
   border: 1px solid var(--rule);
   background: var(--paper-2);
-  /* meio-tom sutil de impressão */
-  filter: grayscale(0.65) contrast(1.08) sepia(0.15);
+
+  /* Foto "impressa" em papel escuro: dessatura + contraste + tom frio */
+  filter: grayscale(0.85) contrast(1.15) brightness(0.85);
+  opacity: 0.92;
+  transition: filter 220ms ease, opacity 220ms ease;
+}
+
+.image:hover {
+  filter: grayscale(0.6) contrast(1.12) brightness(0.95);
+  opacity: 1;
 }
 
 .article:first-child .image {
-  filter: grayscale(0.7) contrast(1.1) sepia(0.18);
+  filter: grayscale(0.9) contrast(1.2) brightness(0.8);
 }
 
 /* ============================================================
@@ -213,24 +252,23 @@
 .meta > span:first-child::after {
   content: '·';
   margin-left: 10px;
-  color: var(--rule-soft);
+  color: var(--rule);
   font-weight: 400;
 }
 
-/* Tom — carimbo de jornal */
+/* Tom — carimbo de jornal na paleta neon */
 .meta > span[data-tone] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 2px 6px;
   border: 1px solid currentColor;
-  border-radius: 2px;
   letter-spacing: 0.16em;
 }
 
-.meta > span[data-tone='positivo'] { color: #2f6b33; }
+.meta > span[data-tone='positivo'] { color: var(--green-400); }
 .meta > span[data-tone='neutro']   { color: var(--ink-faint); }
-.meta > span[data-tone='negativo'] { color: var(--stamp); }
+.meta > span[data-tone='negativo'] { color: var(--yellow-400); }
 
 /* ---------- Manchete ---------- */
 
@@ -242,6 +280,10 @@
   line-height: 1.15;
   letter-spacing: -0.005em;
   color: var(--ink);
+}
+
+.article:first-child h3 {
+  text-shadow: 0 0 30px rgba(34, 197, 94, 0.08);
 }
 
 /* ---------- Submanchete (linha fina) ---------- */
@@ -274,7 +316,7 @@
   column-count: 2;
 }
 
-/* Capitular na manchete principal */
+/* Capitular na manchete principal — verde neon */
 .article:first-child .body::first-letter {
   float: left;
   font-family: 'Playfair Display', 'Georgia', serif;
@@ -282,84 +324,8 @@
   line-height: 0.85;
   font-weight: 900;
   padding: 6px 8px 0 0;
-  color: var(--stamp);
-}
-
-/* ============================================================
-   REDES SOCIAIS — coluna de "repercussão"
-   ============================================================ */
-
-.social {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 10px;
-  padding-top: 22px;
-  border-top: 3px double var(--rule);
-  position: relative;
-}
-
-.social h3 {
-  margin: 0 0 6px;
-  font-family: 'Playfair Display', 'Georgia', serif;
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: -0.005em;
-  color: var(--ink);
-  text-transform: uppercase;
-}
-
-.social h3::after {
-  content: '';
-  display: block;
-  width: 48px;
-  height: 2px;
-  margin-top: 6px;
-  background: var(--stamp);
-}
-
-.post {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  background: var(--paper-2);
-  border: 1px solid var(--rule-soft);
-  border-left: 3px solid var(--ink);
-  border-radius: 2px;
-  position: relative;
-}
-
-/* Aspas tipográficas no canto — cara de citação de jornal */
-.post::before {
-  content: '\201C';
-  position: absolute;
-  top: 2px;
-  right: 10px;
-  font-family: 'Playfair Display', 'Georgia', serif;
-  font-size: 2.6rem;
-  line-height: 1;
-  color: var(--rule-soft);
-  opacity: 0.55;
-  pointer-events: none;
-}
-
-.post p {
-  margin: 0;
-  font-family: 'Georgia', 'Times New Roman', serif;
-  font-size: 0.9rem;
-  font-style: italic;
-  line-height: 1.5;
-  color: var(--ink);
-}
-
-.post span {
-  font-family: 'Georgia', serif;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--green-400);
+  text-shadow: 0 0 20px rgba(74, 222, 128, 0.35);
 }
 
 /* ============================================================
@@ -398,7 +364,6 @@
 @media (max-width: 560px) {
   .container {
     padding: 18px 16px;
-    border-radius: 2px;
   }
 
   .header h2 {
@@ -419,7 +384,10 @@
    ============================================================ */
 
 @media (prefers-reduced-motion: reduce) {
-  .image {
-    filter: none;
+  .image,
+  .image:hover {
+    filter: grayscale(0.85) contrast(1.15) brightness(0.85);
+    opacity: 0.92;
+    transition: none;
   }
 }

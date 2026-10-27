@@ -1,452 +1,900 @@
-// ============================================================
-// TIPOS
-// ============================================================
+// src/game/data/indicators.ts
+// Novo catálogo de atributos nacionais agrupados por 7 áreas
 
 export type IndicatorCategory =
   | 'economia'
   | 'saude'
   | 'educacao'
-  | 'seguranca'
-  | 'infraestrutura'
   | 'social'
-  | 'ambiente'
-  | 'gestao'
-  | 'politica';
+  | 'seguranca'
+  | 'energia'
+  | 'cultura';
 
-/**
- * Onde o indicador existe e como é obtido.
- *
- * - national:            único valor nacional, independente (não vem dos estados)
- * - state:               só existe em estados, sem agregado nacional
- * - state_aggregated:    estados possuem valor, e existe um agregado nacional calculado
- * - national_and_state:  existe valor federal E valor em cada estado (são independentes)
- */
-export type IndicatorScope =
-  | 'national'
-  | 'state'
-  | 'state_aggregated'
-  | 'national_and_state';
-
-export type IndicatorDirection =
-  | 'higher_is_better'
-  | 'lower_is_better'
-  | 'neutral';
-
-/**
- * Peso usado na agregação nacional derivada.
- * Cada indicador escolhe o peso adequado ao seu significado.
- */
-export type AggregationWeight =
-  | 'population'         // população total
-  | 'pea'                // população economicamente ativa
-  | 'target_population'  // população-alvo do indicador (ex: crianças, alunos)
-  | 'none';
-
-export type AggregationRule =
-  | { kind: 'none' }                                                // não agrega
-  | { kind: 'sum' }                                                 // soma valores
-  | { kind: 'mean' }                                                // média simples
-  | { kind: 'weighted_mean'; weight: AggregationWeight };           // média ponderada
-
-export interface IndicatorClassificationTier {
-  label: string;
-  /** Limite inferior (inclusive). null no primeiro tier. */
-  from: number | null;
-  /** Limite superior (exclusive). null no último tier. */
-  to: number | null;
-}
-
+export type IndicatorType = 'slider' | 'calculated';
+export type IndicatorDirection = 'higher_is_better' | 'lower_is_better' | 'neutral';
 
 export interface IndicatorDef {
   id: string;
-  name: string;
-  short?: string;
+  nome: string;
+  curto: string;
   category: IndicatorCategory;
-  scope: IndicatorScope;
-  unit: string;
+  type: IndicatorType;
+  unidade: string;
   direction: IndicatorDirection;
   min: number;
   max: number;
-  /** Valor inicial do Brasil — obrigatório só pra escopo "national". */
-  initial?: number;
-  /** Regra de agregação nacional — obrigatório pra "state_aggregated". */
-  aggregation?: AggregationRule;
-  /** Faixas qualitativas (Muito ruim … Muito bom). Se ausente, o engine gera 5 tiers. */
-  classification?: IndicatorClassificationTier[];
-  description?: string;
+  step?: number;
+  initial: number;
+  descricao: string;
+  formatKind: 'percent' | 'currency_year' | 'currency_month' | 'score' | 'days' | 'per_thousand' | 'per_hundred_thousand' | 'currency_unit' | 'count';
 }
 
-/** Tipos usados pelo estado salvo e pelas telas legadas. */
-export type IndicatorId = string;
-export type IndicatorValues = Record<string, number>;
-export type Area = IndicatorCategory;
+export const INDICATORS: IndicatorDef[] = [
+  // ==========================================
+  // 1. ECONOMIA E FINANÇAS PÚBLICAS
+  // ==========================================
+  // Editáveis (Sliders)
+  {
+    id: 'iva',
+    nome: 'IVA (Imposto sobre Valor Agregado)',
+    curto: 'IVA',
+    category: 'economia',
+    type: 'slider',
+    unidade: '%',
+    direction: 'neutral',
+    min: 5,
+    max: 40,
+    step: 0.5,
+    initial: 26.5,
+    descricao: 'Alíquota geral de tributação sobre o consumo de bens e serviços.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'imposto_renda',
+    nome: 'Imposto de renda',
+    curto: 'IR',
+    category: 'economia',
+    type: 'slider',
+    unidade: '%',
+    direction: 'neutral',
+    min: 0,
+    max: 45,
+    step: 0.5,
+    initial: 27.5,
+    descricao: 'Alíquota máxima de imposto sobre rendimentos de pessoas físicas.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'imposto_empresas',
+    nome: 'Imposto sobre empresas',
+    curto: 'IRPJ / CSLL',
+    category: 'economia',
+    type: 'slider',
+    unidade: '%',
+    direction: 'neutral',
+    min: 5,
+    max: 50,
+    step: 0.5,
+    initial: 34.0,
+    descricao: 'Carga tributária sobre o lucro e faturamento corporativo.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'taxa_selic',
+    nome: 'Taxa Selic',
+    curto: 'Selic',
+    category: 'economia',
+    type: 'slider',
+    unidade: '% a.a.',
+    direction: 'lower_is_better',
+    min: 2,
+    max: 30,
+    step: 0.25,
+    initial: 11.25,
+    descricao: 'Taxa básica de juros da economia estabelecida pelo governo.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'salario_minimo',
+    nome: 'Salário mínimo',
+    curto: 'Salário mínimo',
+    category: 'economia',
+    type: 'slider',
+    unidade: 'R$/mês',
+    direction: 'higher_is_better',
+    min: 1000,
+    max: 6000,
+    step: 10,
+    initial: 1518,
+    descricao: 'Piso salarial legal nacional vigente para trabalhadores.',
+    formatKind: 'currency_month',
+  },
+  {
+    id: 'investimento_publico',
+    nome: 'Investimento público',
+    curto: 'Investimento público',
+    category: 'economia',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 10e9,
+    max: 400e9,
+    step: 1e9,
+    initial: 85e9,
+    descricao: 'Recursos governamentais alocados em infraestrutura, portos, rodovias e logística nacional.',
+    formatKind: 'currency_year',
+  },
 
-// ============================================================
-// HELPERS DE AGREGAÇÃO
-// ============================================================
+  // Calculados
+  {
+    id: 'receitas_governo',
+    nome: 'Receitas do governo',
+    curto: 'Receitas',
+    category: 'economia',
+    type: 'calculated',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 500e9,
+    max: 5000e9,
+    initial: 2450e9,
+    descricao: 'Arrecadação total do governo federal em tributos e taxas.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'despesas_governo',
+    nome: 'Despesas do governo',
+    curto: 'Despesas',
+    category: 'economia',
+    type: 'calculated',
+    unidade: 'R$/ano',
+    direction: 'lower_is_better',
+    min: 500e9,
+    max: 5000e9,
+    initial: 2520e9,
+    descricao: 'Gasto total público com custeio, servidores, previdência e programas.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'saldo_orcamentario',
+    nome: 'Saldo orçamentário',
+    curto: 'Saldo primário',
+    category: 'economia',
+    type: 'calculated',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: -500e9,
+    max: 500e9,
+    initial: -70e9,
+    descricao: 'Diferença entre receitas e despesas governamentais (superávit/déficit).',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'divida_publica',
+    nome: 'Dívida pública',
+    curto: 'Dívida',
+    category: 'economia',
+    type: 'calculated',
+    unidade: 'R$',
+    direction: 'lower_is_better',
+    min: 1000e9,
+    max: 25000e9,
+    initial: 8900e9,
+    descricao: 'Estoque total da dívida bruta do setor público consolidado.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'inflacao',
+    nome: 'Inflação (IPCA)',
+    curto: 'Inflação',
+    category: 'economia',
+    type: 'calculated',
+    unidade: '% ao ano',
+    direction: 'lower_is_better',
+    min: 0,
+    max: 40,
+    initial: 4.2,
+    descricao: 'Taxa anualizada de variação no custo de vida do consumidor.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'desemprego',
+    nome: 'Taxa de desemprego',
+    curto: 'Desemprego',
+    category: 'economia',
+    type: 'calculated',
+    unidade: '%',
+    direction: 'lower_is_better',
+    min: 2,
+    max: 25,
+    initial: 7.3,
+    descricao: 'Percentual da população economicamente ativa sem ocupação formal ou informal.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'crescimento_pib',
+    nome: 'Crescimento do PIB',
+    curto: 'Crescimento PIB',
+    category: 'economia',
+    type: 'calculated',
+    unidade: '%',
+    direction: 'higher_is_better',
+    min: -15,
+    max: 15,
+    initial: 2.5,
+    descricao: 'Taxa anual estimada de expansão do produto interno bruto.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'pib',
+    nome: 'Produto Interno Bruto (PIB)',
+    curto: 'PIB',
+    category: 'economia',
+    type: 'calculated',
+    unidade: 'R$',
+    direction: 'higher_is_better',
+    min: 2000e9,
+    max: 30000e9,
+    initial: 11200e9,
+    descricao: 'Soma total dos bens e serviços produzidos no país no ano.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'dolar',
+    nome: 'Cotação do Dólar',
+    curto: 'Dólar',
+    category: 'economia',
+    type: 'calculated',
+    unidade: 'R$/US$',
+    direction: 'lower_is_better',
+    min: 2.0,
+    max: 12.0,
+    initial: 5.75,
+    descricao: 'Taxa de câmbio nominal do real em relação à moeda norte-americana.',
+    formatKind: 'currency_unit',
+  },
 
-const AGG_NONE: AggregationRule = { kind: 'none' };
-const AGG_SUM: AggregationRule = { kind: 'sum' };
-const AGG_POP: AggregationRule = { kind: 'weighted_mean', weight: 'population' };
-const AGG_PEA: AggregationRule = { kind: 'weighted_mean', weight: 'pea' };
-const AGG_TARGET: AggregationRule = { kind: 'weighted_mean', weight: 'target_population' };
+  // ==========================================
+  // 2. SAÚDE
+  // ==========================================
+  // Editáveis
+  {
+    id: 'orcamento_saude',
+    nome: 'Orçamento da saúde',
+    curto: 'Orçamento saúde',
+    category: 'saude',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 50e9,
+    max: 500e9,
+    step: 2e9,
+    initial: 218e9,
+    descricao: 'Dotação orçamentária anual para o Sistema Único de Saúde e atenção básica.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'salarios_saude',
+    nome: 'Salários dos profissionais de saúde',
+    curto: 'Salários saúde',
+    category: 'saude',
+    type: 'slider',
+    unidade: 'R$/mês',
+    direction: 'higher_is_better',
+    min: 2000,
+    max: 25000,
+    step: 100,
+    initial: 6800,
+    descricao: 'Remuneração média dos médicos, enfermeiros e agentes de saúde.',
+    formatKind: 'currency_month',
+  },
+  {
+    id: 'investimento_hospitais',
+    nome: 'Investimento em hospitais e UBS',
+    curto: 'Inv. hospitais/UBS',
+    category: 'saude',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 5e9,
+    max: 100e9,
+    step: 1e9,
+    initial: 24e9,
+    descricao: 'Recursos para reformas, novos leitos, UPAs e ampliação de equipamentos hospitalares.',
+    formatKind: 'currency_year',
+  },
 
-// ============================================================
-// FÁBRICAS CURTAS
-// ============================================================
+  // Calculados
+  {
+    id: 'qualidade_saude',
+    nome: 'Qualidade da saúde',
+    curto: 'Qualidade saúde',
+    category: 'saude',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 58,
+    descricao: 'Nível de excelência e resolutividade nos atendimentos e tratamentos clínicos.',
+    formatKind: 'score',
+  },
+  {
+    id: 'acesso_saude',
+    nome: 'Acesso à saúde',
+    curto: 'Acesso saúde',
+    category: 'saude',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 64,
+    descricao: 'Cobertura territorial e facilidade em obter consultas, exames e remédios.',
+    formatKind: 'score',
+  },
+  {
+    id: 'tempo_espera_saude',
+    nome: 'Tempo de espera por atendimento',
+    curto: 'Tempo espera saúde',
+    category: 'saude',
+    type: 'calculated',
+    unidade: 'dias',
+    direction: 'lower_is_better',
+    min: 1,
+    max: 180,
+    initial: 42,
+    descricao: 'Tempo médio de espera entre agendamento e realização de procedimentos e consultas especializadas.',
+    formatKind: 'days',
+  },
+  {
+    id: 'mortalidade_infantil',
+    nome: 'Mortalidade infantil',
+    curto: 'Mortalidade infantil',
+    category: 'saude',
+    type: 'calculated',
+    unidade: '/1.000 nascidos',
+    direction: 'lower_is_better',
+    min: 1,
+    max: 50,
+    initial: 11.8,
+    descricao: 'Óbitos de crianças menores de 1 ano para cada mil nascidos vivos.',
+    formatKind: 'per_thousand',
+  },
 
-// Nacional independente
-const N = (
-  id: string,
-  name: string,
-  unit: string,
-  initial: number,
-  min: number,
-  max: number,
-  direction: IndicatorDirection,
-  opts: Partial<IndicatorDef> = {},
-): IndicatorDef => ({
-  id, name, unit, initial, min, max, direction,
-  category: 'economia', scope: 'national',
-  aggregation: AGG_NONE, ...opts,
-});
+  // ==========================================
+  // 3. EDUCAÇÃO
+  // ==========================================
+  // Editáveis
+  {
+    id: 'orcamento_educacao',
+    nome: 'Orçamento da educação',
+    curto: 'Orçamento educação',
+    category: 'educacao',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 50e9,
+    max: 400e9,
+    step: 2e9,
+    initial: 175e9,
+    descricao: 'Verba anual do Ministério da Educação e transferências para o FUNDEB.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'salarios_professores',
+    nome: 'Salários dos professores',
+    curto: 'Salários professores',
+    category: 'educacao',
+    type: 'slider',
+    unidade: 'R$/mês',
+    direction: 'higher_is_better',
+    min: 2000,
+    max: 20000,
+    step: 100,
+    initial: 4850,
+    descricao: 'Piso salarial médio pago a docentes do ensino básico e superior público.',
+    formatKind: 'currency_month',
+  },
+  {
+    id: 'investimento_escolas',
+    nome: 'Investimento em escolas e creches',
+    curto: 'Inv. escolas',
+    category: 'educacao',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 5e9,
+    max: 80e9,
+    step: 1e9,
+    initial: 22e9,
+    descricao: 'Recursos para infraestrutura escolar, laboratórios, conectividade e novas creches.',
+    formatKind: 'currency_year',
+  },
 
-// Estadual + agregado nacional (precisa de regra)
-const SA = (
-  id: string,
-  name: string,
-  unit: string,
-  min: number,
-  max: number,
-  direction: IndicatorDirection,
-  aggregation: AggregationRule,
-  category: IndicatorCategory,
-  opts: Partial<IndicatorDef> = {},
-): IndicatorDef => ({
-  id, name, unit, min, max, direction,
-  category, scope: 'state_aggregated',
-  aggregation, ...opts,
-});
+  // Calculados
+  {
+    id: 'qualidade_educacao',
+    nome: 'Qualidade da educação (IDEB)',
+    curto: 'Qualidade educação',
+    category: 'educacao',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 54,
+    descricao: 'Média de rendimento e aprendizado dos alunos nas avaliações nacionais.',
+    formatKind: 'score',
+  },
+  {
+    id: 'acesso_educacao',
+    nome: 'Acesso à educação',
+    curto: 'Acesso educação',
+    category: 'educacao',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 76,
+    descricao: 'Taxa de matrícula de crianças e jovens em creches, escolas e faculdades.',
+    formatKind: 'score',
+  },
+  {
+    id: 'taxa_analfabetismo',
+    nome: 'Taxa de analfabetismo',
+    curto: 'Analfabetismo',
+    category: 'educacao',
+    type: 'calculated',
+    unidade: '%',
+    direction: 'lower_is_better',
+    min: 0.5,
+    max: 25,
+    initial: 5.4,
+    descricao: 'População com 15 anos ou mais incapaz de ler e escrever um bilhete simples.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'evasao_escolar',
+    nome: 'Evasão escolar',
+    curto: 'Evasão escolar',
+    category: 'educacao',
+    type: 'calculated',
+    unidade: '%',
+    direction: 'lower_is_better',
+    min: 0.5,
+    max: 30,
+    initial: 7.1,
+    descricao: 'Percentual de estudantes do ensino fundamental e médio que abandonam os estudos.',
+    formatKind: 'percent',
+  },
 
-// Nacional + estadual (dois valores, sem agregação)
-const NS = (
-  id: string,
-  name: string,
-  unit: string,
-  min: number,
-  max: number,
-  direction: IndicatorDirection,
-  category: IndicatorCategory,
-  initial?: number,
-  opts: Partial<IndicatorDef> = {},
-): IndicatorDef => ({
-  id, name, unit, min, max, direction,
-  category, scope: 'national_and_state',
-  aggregation: AGG_NONE, initial, ...opts,
-});
+  // ==========================================
+  // 4. SOCIAL
+  // ==========================================
+  // Editáveis
+  {
+    id: 'bolsa_familia',
+    nome: 'Valor médio do Bolsa Família',
+    curto: 'Bolsa Família',
+    category: 'social',
+    type: 'slider',
+    unidade: 'R$/família/mês',
+    direction: 'higher_is_better',
+    min: 200,
+    max: 2000,
+    step: 10,
+    initial: 685,
+    descricao: 'Benefício mensal de transferência de renda a famílias em situação de vulnerabilidade.',
+    formatKind: 'currency_month',
+  },
+  {
+    id: 'orcamento_assistencia_social',
+    nome: 'Orçamento da assistência social',
+    curto: 'Assistência social',
+    category: 'social',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 20e9,
+    max: 300e9,
+    step: 2e9,
+    initial: 168e9,
+    descricao: 'Recursos para o SUAS, BPC, acolhimento e programas de combate à fome.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'investimento_habitacao',
+    nome: 'Investimento em habitação popular',
+    curto: 'Habitação popular',
+    category: 'social',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 2e9,
+    max: 80e9,
+    step: 1e9,
+    initial: 18e9,
+    descricao: 'Subsídios e construção de moradias populares para famílias de baixa renda.',
+    formatKind: 'currency_year',
+  },
 
-// ============================================================
-// 1. ECONOMIA
-// ============================================================
+  // Calculados
+  {
+    id: 'taxa_pobreza',
+    nome: 'Taxa de pobreza',
+    curto: 'Pobreza',
+    category: 'social',
+    type: 'calculated',
+    unidade: '%',
+    direction: 'lower_is_better',
+    min: 2,
+    max: 50,
+    initial: 24.2,
+    descricao: 'Percentual da população vivendo com renda abaixo da linha de pobreza.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'extrema_pobreza',
+    nome: 'Extrema pobreza',
+    curto: 'Extrema pobreza',
+    category: 'social',
+    type: 'calculated',
+    unidade: '%',
+    direction: 'lower_is_better',
+    min: 0.5,
+    max: 20,
+    initial: 4.8,
+    descricao: 'Percentual vivendo em situação de miséria ou insegurança alimentar severa.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'desigualdade_renda',
+    nome: 'Desigualdade de renda (Gini)',
+    curto: 'Desigualdade (Gini)',
+    category: 'social',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'lower_is_better',
+    min: 20,
+    max: 80,
+    initial: 51.8,
+    descricao: 'Concentração de renda na sociedade (índice de 0 a 100, onde maior significa pior).',
+    formatKind: 'score',
+  },
+  {
+    id: 'qualidade_vida',
+    nome: 'Qualidade de vida (IDH sintético)',
+    curto: 'Qualidade de vida',
+    category: 'social',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 68,
+    descricao: 'Índice de bem-estar social combinando renda, saúde, longevidade e cidadania.',
+    formatKind: 'score',
+  },
+  {
+    id: 'aprovacao_popular',
+    nome: 'Aprovação popular do governo',
+    curto: 'Aprovação popular',
+    category: 'social',
+    type: 'calculated',
+    unidade: '%',
+    direction: 'higher_is_better',
+    min: 1,
+    max: 100,
+    initial: 50.0,
+    descricao: 'Avaliação positiva direta do mandato do Presidente entre os cidadãos.',
+    formatKind: 'percent',
+  },
 
-const ECONOMIA: IndicatorDef[] = [
-  N('inflacao', 'Inflação', '% ao ano', 4.5, -10, 100, 'lower_is_better', { category: 'economia' }),
-  SA('desemprego', 'Desemprego', '%', 0, 40, 'lower_is_better', AGG_PEA, 'economia'),
-  SA('crescimento_pib', 'Crescimento do PIB', '% ao ano', -15, 15, 'higher_is_better', AGG_POP, 'economia'),
-  N('pib_nominal', 'PIB nominal', 'R$ bilhões', 11000, 500, 50000, 'higher_is_better', { category: 'economia' }),
-  N('divida_publica', 'Dívida pública', 'R$ bilhões', 7800, 0, 30000, 'lower_is_better', { category: 'economia', description: 'Armazenada em R$ bilhões. % do PIB é calculada à parte.' }),
-  N('carga_tributaria', 'Carga tributária', '% do PIB', 33, 15, 60, 'lower_is_better', { category: 'economia' }),
-  NS('receitas_publicas', 'Receitas públicas', 'R$ bilhões', 0, 20000, 'higher_is_better', 'economia'),
-  NS('gastos_publicos', 'Gastos públicos', 'R$ bilhões', 0, 20000, 'neutral', 'economia'),
-  NS('saldo_orcamentario', 'Saldo orçamentário', 'R$ bilhões', -3000, 3000, 'higher_is_better', 'economia'),
-  N('cotacao_dolar', 'Cotação do dólar', 'R$/US$', 5.20, 0.5, 30, 'neutral', { category: 'economia' }),
-  N('selic', 'Taxa Selic', '% ao ano', 10.5, 0, 60, 'neutral', { category: 'economia' }),
-  N('salario_minimo', 'Salário mínimo', 'R$', 1412, 0, 20000, 'higher_is_better', { category: 'economia' }),
-  SA('poder_compra', 'Poder de compra', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'economia'),
-  SA('empregos_formais', 'Empregos formais', 'empregos', 0, 200_000_000, 'higher_is_better', AGG_SUM, 'economia'),
-  SA('informalidade', 'Informalidade', '% dos ocupados', 0, 100, 'lower_is_better', AGG_PEA, 'economia'),
-  NS('investimentos_publicos', 'Investimentos públicos', 'R$ bilhões', 0, 5000, 'higher_is_better', 'economia'),
-  SA('investimentos_privados', 'Investimentos privados', 'R$ bilhões', 0, 20000, 'higher_is_better', AGG_SUM, 'economia'),
-  N('balanca_comercial', 'Balança comercial', 'R$ bilhões', 80, -500, 500, 'higher_is_better', { category: 'economia' }),
-  NS('orcamento_saude', 'Orçamento da saúde', 'R$ bilhões', 0, 3000, 'higher_is_better', 'economia'),
-  NS('orcamento_educacao', 'Orçamento da educação', 'R$ bilhões', 0, 3000, 'higher_is_better', 'economia'),
+  // ==========================================
+  // 5. SEGURANÇA PÚBLICA
+  // ==========================================
+  // Editáveis
+  {
+    id: 'orcamento_seguranca',
+    nome: 'Orçamento da segurança',
+    curto: 'Orçamento segurança',
+    category: 'seguranca',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 10e9,
+    max: 150e9,
+    step: 1e9,
+    initial: 42e9,
+    descricao: 'Recursos para Polícia Federal, Rodoviária, inteligência e repasses aos estados (FNSP).',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'efetivo_policial',
+    nome: 'Efetivo policial',
+    curto: 'Efetivo policial',
+    category: 'seguranca',
+    type: 'slider',
+    unidade: 'agentes',
+    direction: 'higher_is_better',
+    min: 200000,
+    max: 900000,
+    step: 5000,
+    initial: 490000,
+    descricao: 'Número total de policiais militares, civis, federais e guardas em atividade.',
+    formatKind: 'count',
+  },
+  {
+    id: 'orcamento_prisional',
+    nome: 'Orçamento prisional',
+    curto: 'Orçamento prisional',
+    category: 'seguranca',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 2e9,
+    max: 40e9,
+    step: 0.5e9,
+    initial: 12e9,
+    descricao: 'Manutenção, gestão penitenciária e construção de novas vagas prisionais.',
+    formatKind: 'currency_year',
+  },
+
+  // Calculados
+  {
+    id: 'criminalidade',
+    nome: 'Criminalidade geral',
+    curto: 'Criminalidade',
+    category: 'seguranca',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'lower_is_better',
+    min: 5,
+    max: 100,
+    initial: 62,
+    descricao: 'Índice agregado de roubos, furtos e crimes violentos (maior é pior).',
+    formatKind: 'score',
+  },
+  {
+    id: 'homicidios',
+    nome: 'Taxa de homicídios',
+    curto: 'Homicídios',
+    category: 'seguranca',
+    type: 'calculated',
+    unidade: '/100 mil hab.',
+    direction: 'lower_is_better',
+    min: 2,
+    max: 60,
+    initial: 21.4,
+    descricao: 'Número de mortes violentas intencionais para cada 100 mil habitantes no ano.',
+    formatKind: 'per_hundred_thousand',
+  },
+  {
+    id: 'eficiencia_policial',
+    nome: 'Eficiência policial',
+    curto: 'Eficiência policial',
+    category: 'seguranca',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 10,
+    max: 100,
+    initial: 48,
+    descricao: 'Taxa de elucidação de crimes, tempo de resposta e integração operacional.',
+    formatKind: 'score',
+  },
+  {
+    id: 'condicoes_prisionais',
+    nome: 'Condições do sistema prisional',
+    curto: 'Sistema prisional',
+    category: 'seguranca',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 32,
+    descricao: 'Capacidade de controle do Estado, redução da superlotação e reinserção.',
+    formatKind: 'score',
+  },
+
+  // ==========================================
+  // 6. ENERGIA
+  // ==========================================
+  // Editáveis
+  {
+    id: 'investimento_energia',
+    nome: 'Investimento energético',
+    curto: 'Inv. energia',
+    category: 'energia',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 5e9,
+    max: 120e9,
+    step: 1e9,
+    initial: 35e9,
+    descricao: 'Aportes em linhas de transmissão, usinas e infraestrutura da matriz energética.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'subsidios_energia',
+    nome: 'Subsídios à energia',
+    curto: 'Subsídios energia',
+    category: 'energia',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'neutral',
+    min: 0,
+    max: 80e9,
+    step: 1e9,
+    initial: 22e9,
+    descricao: 'Subvenções tarifárias para consumidores vulneráveis e incentivos de transição.',
+    formatKind: 'currency_year',
+  },
+
+  // Calculados
+  {
+    id: 'custo_energia',
+    nome: 'Custo médio da energia',
+    curto: 'Custo da energia',
+    category: 'energia',
+    type: 'calculated',
+    unidade: 'R$/kWh',
+    direction: 'lower_is_better',
+    min: 0.2,
+    max: 2.5,
+    initial: 0.88,
+    descricao: 'Tarifa média de energia elétrica cobrada das residências e empresas.',
+    formatKind: 'currency_unit',
+  },
+  {
+    id: 'seguranca_energetica',
+    nome: 'Segurança energética',
+    curto: 'Segurança energética',
+    category: 'energia',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 10,
+    max: 100,
+    initial: 74,
+    descricao: 'Estabilidade de fornecimento, capacidade de reservatórios e reserva de potência.',
+    formatKind: 'score',
+  },
+  {
+    id: 'participacao_renovaveis',
+    nome: 'Participação de fontes renováveis',
+    curto: 'Renováveis',
+    category: 'energia',
+    type: 'calculated',
+    unidade: '%',
+    direction: 'higher_is_better',
+    min: 10,
+    max: 100,
+    initial: 84.5,
+    descricao: 'Participação de hídrica, eólica, solar e biomassa na matriz elétrica nacional.',
+    formatKind: 'percent',
+  },
+  {
+    id: 'qualidade_fornecimento_energia',
+    nome: 'Qualidade do fornecimento elétrico',
+    curto: 'Qualidade da rede',
+    category: 'energia',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 10,
+    max: 100,
+    initial: 68,
+    descricao: 'Índices DEC/FEC de continuidade e confiabilidade da rede elétrica.',
+    formatKind: 'score',
+  },
+
+  // ==========================================
+  // 7. CULTURA
+  // ==========================================
+  // Editáveis
+  {
+    id: 'orcamento_cultura',
+    nome: 'Orçamento da cultura',
+    curto: 'Orçamento cultura',
+    category: 'cultura',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 0.5e9,
+    max: 20e9,
+    step: 0.2e9,
+    initial: 3.5e9,
+    descricao: 'Orçamento direto do Ministério da Cultura e órgãos de fomento artístico.',
+    formatKind: 'currency_year',
+  },
+  {
+    id: 'incentivos_culturais',
+    nome: 'Incentivos à produção cultural',
+    curto: 'Incentivos culturais',
+    category: 'cultura',
+    type: 'slider',
+    unidade: 'R$/ano',
+    direction: 'higher_is_better',
+    min: 0.2e9,
+    max: 15e9,
+    step: 0.2e9,
+    initial: 4.2e9,
+    descricao: 'Renúncia fiscal (Lei Rouanet, Paulo Gustavo, Aldir Blanc) e editais setoriais.',
+    formatKind: 'currency_year',
+  },
+
+  // Calculados
+  {
+    id: 'acesso_cultura',
+    nome: 'Acesso à cultura',
+    curto: 'Acesso à cultura',
+    category: 'cultura',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 44,
+    descricao: 'Acesso da população a museus, cinemas, teatros, bibliotecas e eventos artísticos.',
+    formatKind: 'score',
+  },
+  {
+    id: 'producao_cultural',
+    nome: 'Produção cultural nacional',
+    curto: 'Produção cultural',
+    category: 'cultura',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 58,
+    descricao: 'Volume de obras audiovisuais, literárias, musicais e patrimônio criativo produzido.',
+    formatKind: 'score',
+  },
+  {
+    id: 'preservacao_patrimonio',
+    nome: 'Preservação do patrimônio histórico',
+    curto: 'Preservação patrimônio',
+    category: 'cultura',
+    type: 'calculated',
+    unidade: '0–100',
+    direction: 'higher_is_better',
+    min: 0,
+    max: 100,
+    initial: 50,
+    descricao: 'Conservação de sítios arqueológicos, cidades históricas e monumentos tombados.',
+    formatKind: 'score',
+  },
 ];
 
-// ============================================================
-// 2. SAÚDE
-// ============================================================
+export const INDICATORS_BY_ID = Object.fromEntries(
+  INDICATORS.map((ind) => [ind.id, ind]),
+) as Record<string, IndicatorDef>;
 
-const SAUDE: IndicatorDef[] = [
-  SA('acesso_saude', 'Acesso à saúde', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'saude'),
-  SA('tempo_espera_saude', 'Tempo de espera na saúde', 'dias', 0, 365, 'lower_is_better', AGG_POP, 'saude'),
-  SA('cobertura_vacinacao', 'Cobertura vacinal', '%', 0, 100, 'higher_is_better', AGG_TARGET, 'saude'),
-  SA('medicos_por_habitante', 'Médicos por habitante', 'por 1.000 hab.', 0, 20, 'higher_is_better', AGG_POP, 'saude'),
-  SA('capacidade_hospitais', 'Capacidade dos hospitais', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'saude'),
-  SA('ocupacao_hospitais', 'Ocupação dos hospitais', '%', 0, 100, 'lower_is_better', AGG_POP, 'saude'),
-  SA('mortalidade_infantil', 'Mortalidade infantil', 'por 1.000 nascidos', 0, 80, 'lower_is_better', AGG_POP, 'saude'),
-  SA('mortalidade_materna', 'Mortalidade materna', 'por 100.000 nascidos', 0, 400, 'lower_is_better', AGG_POP, 'saude'),
-  SA('satisfacao_saude', 'Satisfação com a saúde', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'saude'),
-];
-
-// ============================================================
-// 3. EDUCAÇÃO
-// ============================================================
-
-const EDUCACAO: IndicatorDef[] = [
-  SA('frequencia_escolar', 'Frequência escolar', '%', 0, 100, 'higher_is_better', AGG_TARGET, 'educacao'),
-  SA('evasao_escolar', 'Evasão escolar', '%', 0, 100, 'lower_is_better', AGG_TARGET, 'educacao'),
-  SA('conclusao_medio', 'Conclusão do ensino médio', '%', 0, 100, 'higher_is_better', AGG_TARGET, 'educacao'),
-  SA('alfabetizacao', 'Alfabetização', '%', 0, 100, 'higher_is_better', AGG_POP, 'educacao'),
-  SA('analfabetismo', 'Analfabetismo', '%', 0, 100, 'lower_is_better', AGG_POP, 'educacao'),
-  SA('infraestrutura_escolar', 'Infraestrutura escolar', '0–100', 0, 100, 'higher_is_better', AGG_TARGET, 'educacao'),
-  SA('acesso_educacao_infantil', 'Acesso à educação infantil', '%', 0, 100, 'higher_is_better', AGG_TARGET, 'educacao'),
-  SA('professores_por_aluno', 'Professores por aluno', 'alunos por professor', 0, 80, 'lower_is_better', AGG_TARGET, 'educacao'),
-];
-
-// ============================================================
-// 4. SEGURANÇA PÚBLICA
-// ============================================================
-
-const SEGURANCA: IndicatorDef[] = [
-  SA('homicidios', 'Taxa de homicídios', 'por 100.000 hab.', 0, 200, 'lower_is_better', AGG_POP, 'seguranca'),
-  SA('roubos', 'Taxa de roubos', 'por 100.000 hab.', 0, 2000, 'lower_is_better', AGG_POP, 'seguranca'),
-  SA('furtos', 'Taxa de furtos', 'por 100.000 hab.', 0, 3000, 'lower_is_better', AGG_POP, 'seguranca'),
-  SA('investigacao_policial', 'Capacidade de investigação', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'seguranca'),
-  SA('crimes_solucionados', 'Crimes solucionados', '%', 0, 100, 'higher_is_better', AGG_POP, 'seguranca'),
-  SA('efetivo_policial', 'Efetivo policial', 'por 100.000 hab.', 0, 1500, 'higher_is_better', AGG_POP, 'seguranca'),
-  SA('tempo_resposta_policial', 'Tempo de resposta policial', 'minutos', 0, 240, 'lower_is_better', AGG_POP, 'seguranca'),
-  SA('capacidade_prisional', 'Capacidade do sistema prisional', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'seguranca'),
-  SA('percepcao_seguranca', 'Percepção de segurança', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'seguranca'),
-];
-
-// ============================================================
-// 5. INFRAESTRUTURA E SANEAMENTO
-// ============================================================
-
-const INFRAESTRUTURA: IndicatorDef[] = [
-  SA('acesso_agua', 'Acesso à água tratada', '%', 0, 100, 'higher_is_better', AGG_POP, 'infraestrutura'),
-  SA('coleta_esgoto', 'Coleta de esgoto', '%', 0, 100, 'higher_is_better', AGG_POP, 'infraestrutura'),
-  SA('tratamento_esgoto', 'Tratamento de esgoto', '%', 0, 100, 'higher_is_better', AGG_POP, 'infraestrutura'),
-  SA('qualidade_estradas', 'Qualidade das estradas', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'infraestrutura'),
-  SA('acesso_internet', 'Acesso à internet', '% domicílios', 0, 100, 'higher_is_better', AGG_POP, 'infraestrutura'),
-  SA('deficit_habitacional', 'Déficit habitacional', 'domicílios', 0, 20_000_000, 'lower_is_better', AGG_SUM, 'infraestrutura'),
-  NS('investimento_infraestrutura', 'Investimento em infraestrutura', 'R$ bilhões', 0, 2000, 'higher_is_better', 'infraestrutura'),
-  SA('qualidade_transporte', 'Qualidade do transporte público', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'infraestrutura'),
-  SA('tempo_deslocamento', 'Tempo médio de deslocamento', 'min/trajeto', 0, 180, 'lower_is_better', AGG_POP, 'infraestrutura'),
-];
-
-// ============================================================
-// 6. ASSISTÊNCIA SOCIAL E DESIGUALDADE
-// ============================================================
-
-const SOCIAL: IndicatorDef[] = [
-  SA('idh', 'IDH (simulado)', '0–1', 0, 1, 'higher_is_better', AGG_POP, 'social', {
-    description: 'Índice de desenvolvimento humano do jogo, estimado por saúde, educação e renda; não é o cálculo oficial do IDH.',
-  }),
-  SA('pobreza', 'Taxa de pobreza', '%', 0, 100, 'lower_is_better', AGG_POP, 'social'),
-  SA('pobreza_extrema', 'Pobreza extrema', '%', 0, 100, 'lower_is_better', AGG_POP, 'social'),
-  SA('gini', 'Desigualdade (Gini)', '0–1', 0, 1, 'lower_is_better', AGG_POP, 'social'),
-  SA('renda_media', 'Renda média das famílias', 'R$/mês', 0, 30000, 'higher_is_better', AGG_POP, 'social'),
-  SA('familias_programas_sociais', 'Famílias em programas sociais', 'famílias', 0, 100_000_000, 'higher_is_better', AGG_SUM, 'social'),
-  SA('pessoas_rua', 'Pessoas em situação de rua', 'pessoas', 0, 2_000_000, 'lower_is_better', AGG_SUM, 'social'),
-  SA('moradia_adequada', 'Acesso à moradia adequada', '%', 0, 100, 'higher_is_better', AGG_POP, 'social'),
-  SA('desemprego_jovem', 'Desemprego entre jovens', '%', 0, 60, 'lower_is_better', AGG_PEA, 'social'),
-];
-
-// ============================================================
-// 7. MEIO AMBIENTE E ENERGIA
-// ============================================================
-
-const AMBIENTE: IndicatorDef[] = [
-  SA('desmatamento', 'Desmatamento', 'km²/ano', 0, 50000, 'lower_is_better', AGG_SUM, 'ambiente'),
-  SA('qualidade_ar', 'Qualidade do ar', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'ambiente'),
-  SA('qualidade_agua', 'Qualidade da água', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'ambiente'),
-  SA('emissoes_gee', 'Emissões de GEE', 'tCO₂e/ano', 0, 5_000_000_000, 'lower_is_better', AGG_SUM, 'ambiente'),
-  SA('renovaveis_energia', 'Participação renovável', '%', 0, 100, 'higher_is_better', AGG_POP, 'ambiente'),
-  SA('capacidade_geracao', 'Capacidade de geração', 'MW', 0, 500_000, 'higher_is_better', AGG_SUM, 'ambiente'),
-  SA('custo_energia', 'Custo da energia', 'R$/kWh', 0, 5, 'lower_is_better', AGG_POP, 'ambiente'),
-  SA('reciclagem', 'Coleta e reciclagem', '%', 0, 100, 'higher_is_better', AGG_POP, 'ambiente'),
-  SA('areas_protegidas', 'Áreas protegidas', '% do território', 0, 100, 'higher_is_better', AGG_POP, 'ambiente'),
-];
-
-// ============================================================
-// 8. GESTÃO PÚBLICA
-// ============================================================
-
-const GESTAO: IndicatorDef[] = [
-  NS('eficiencia_gastos', 'Eficiência dos gastos públicos', '0–100', 0, 100, 'higher_is_better', 'gestao', 50),
-  NS('execucao_orcamento', 'Execução do orçamento', '%', 0, 100, 'higher_is_better', 'gestao', 85),
-  NS('investimentos_concluidos', 'Investimentos concluídos', 'projetos', 0, 100_000, 'higher_is_better', 'gestao'),
-  NS('qualidade_servicos', 'Qualidade dos serviços públicos', '0–100', 0, 100, 'higher_is_better', 'gestao', 50),
-  NS('tempo_espera_servicos', 'Tempo de espera por serviços', 'dias', 0, 365, 'lower_is_better', 'gestao', 30),
-  NS('capacidade_administrativa', 'Capacidade administrativa', '0–100', 0, 100, 'higher_is_better', 'gestao', 50),
-  NS('transparencia', 'Transparência pública', '0–100', 0, 100, 'higher_is_better', 'gestao', 60),
-  NS('irregularidades', 'Irregularidades identificadas', 'casos', 0, 100000, 'lower_is_better', 'gestao'),
-  NS('eficiencia_arrecadacao', 'Eficiência na arrecadação', '%', 0, 100, 'higher_is_better', 'gestao', 70),
-];
-
-// ============================================================
-// 9. POLÍTICA E OPINIÃO PÚBLICA
-// ============================================================
-
-const POLITICA: IndicatorDef[] = [
-  N('apoio_camara', 'Apoio na Câmara', '%', 40, 0, 100, 'higher_is_better', { category: 'politica' }),
-  N('apoio_senado', 'Apoio no Senado', '%', 40, 0, 100, 'higher_is_better', { category: 'politica' }),
-  N('confianca_instituicoes', 'Confiança nas instituições', '0–100', 50, 0, 100, 'higher_is_better', { category: 'politica' }),
-  SA('satisfacao_servicos', 'Satisfação com serviços públicos', '0–100', 0, 100, 'higher_is_better', AGG_POP, 'politica'),
-  // 'apoio_por_regiao' é derivado — não armazenado aqui.
-];
-
-// ============================================================
-// CATÁLOGO CONSOLIDADO
-// ============================================================
-
-const ALL: IndicatorDef[] = [
-  ...ECONOMIA,
-  ...SAUDE,
-  ...EDUCACAO,
-  ...SEGURANCA,
-  ...INFRAESTRUTURA,
-  ...SOCIAL,
-  ...AMBIENTE,
-  ...GESTAO,
-  ...POLITICA,
-];
-
-export const INDICATORS: Record<string, IndicatorDef> = Object.fromEntries(
-  ALL.map((i) => [i.id, i]),
-);
-
-export const INDICATOR_IDS = ALL.map((i) => i.id);
-
-// ============================================================
-// HELPERS
-// ============================================================
+export const INDICATOR_IDS = INDICATORS.map((i) => i.id);
 
 export function getIndicator(id: string): IndicatorDef {
-  const ind = INDICATORS[id];
-  if (!ind) throw new Error(`Indicador desconhecido: ${id}`);
+  const ind = INDICATORS_BY_ID[id];
+  if (!ind) {
+    return {
+      id,
+      nome: id,
+      curto: id,
+      category: 'economia',
+      type: 'calculated',
+      unidade: '',
+      direction: 'neutral',
+      min: 0,
+      max: 100,
+      initial: 50,
+      descricao: '',
+      formatKind: 'score',
+    };
+  }
   return ind;
-}
-
-export function hasIndicator(id: string): boolean {
-  return id in INDICATORS;
-}
-
-export function indicatorsByCategory(cat: IndicatorCategory): IndicatorDef[] {
-  return ALL.filter((i) => i.category === cat);
-}
-
-export function isNationalIndependent(i: IndicatorDef): boolean {
-  return i.scope === 'national';
-}
-
-export function isStateAggregated(i: IndicatorDef): boolean {
-  return i.scope === 'state_aggregated';
-}
-
-export function isNationalAndState(i: IndicatorDef): boolean {
-  return i.scope === 'national_and_state';
-}
-
-export function isStateOnly(i: IndicatorDef): boolean {
-  return i.scope === 'state';
-}
-
-/** Indicadores que existem por estado (todos os escopos que têm valor estadual). */
-export function stateScopedIndicators(): IndicatorDef[] {
-  return ALL.filter(
-    (i) => i.scope === 'state' || i.scope === 'state_aggregated' || i.scope === 'national_and_state',
-  );
-}
-
-/** Indicadores com valor nacional independente armazenado. */
-export function nationalIndependentIndicators(): IndicatorDef[] {
-  return ALL.filter((i) => i.scope === 'national');
-}
-
-/** Indicadores cujo valor nacional é calculado a partir dos estados. */
-export function nationalDerivedIndicators(): IndicatorDef[] {
-  return ALL.filter((i) => i.scope === 'state_aggregated');
-}
-
-// ============================================================
-// CLASSIFICAÇÃO QUALITATIVA
-// ============================================================
-
-/** Labels padrão para escalas "quanto maior, melhor". */
-const TIERS_HIGHER_IS_BETTER = [
-  'Muito ruim',
-  'Ruim',
-  'Regular',
-  'Bom',
-  'Muito bom',
-] as const;
-
-/** Labels padrão para escalas "quanto menor, melhor". */
-const TIERS_LOWER_IS_BETTER = [
-  'Muito bom',
-  'Bom',
-  'Regular',
-  'Ruim',
-  'Muito ruim',
-] as const;
-
-/** Labels neutros — usados quando o indicador não tem direção valorativa. */
-const TIERS_NEUTRAL = [
-  'Muito baixo',
-  'Baixo',
-  'Médio',
-  'Alto',
-  'Muito alto',
-] as const;
-
-const TIER_COUNT = 5;
-
-function labelsFor(direction: IndicatorDirection): readonly string[] {
-  switch (direction) {
-    case 'higher_is_better': return TIERS_HIGHER_IS_BETTER;
-    case 'lower_is_better': return TIERS_LOWER_IS_BETTER;
-    case 'neutral': return TIERS_NEUTRAL;
-  }
-}
-
-/**
- * Retorna as faixas de classificação do indicador.
- * Se o indicador já traz `classification`, usa. Caso contrário, gera 5 faixas
- * iguais no intervalo [min, max], com os rótulos invertidos conforme a direção.
- */
-export function generateClassification(ind: IndicatorDef): IndicatorClassificationTier[] {
-  if (ind.classification && ind.classification.length > 0) {
-    return ind.classification;
-  }
-
-  const labels = labelsFor(ind.direction);
-  const span = ind.max - ind.min;
-  const step = span / TIER_COUNT;
-
-  const tiers: IndicatorClassificationTier[] = [];
-  for (let i = 0; i < TIER_COUNT; i++) {
-    const from = ind.min + i * step;
-    const to = i === TIER_COUNT - 1 ? null : ind.min + (i + 1) * step;
-    tiers.push({ label: labels[i], from, to });
-  }
-  return tiers;
-}
-
-/** Retorna o rótulo qualitativo de um valor para um indicador. */
-export function classifyValue(ind: IndicatorDef, value: number): string {
-  const tiers = generateClassification(ind);
-  for (const tier of tiers) {
-    const aboveMin = tier.from === null || value >= tier.from;
-    const belowMax = tier.to === null || value < tier.to;
-    if (aboveMin && belowMax) return tier.label;
-  }
-  // Caso extremo: valor igual ao `max` exato cai no último tier.
-  return tiers[tiers.length - 1].label;
-}
-
-/** Conveniência: classifica direto por id. */
-export function classifyById(id: string, value: number): string {
-  return classifyValue(getIndicator(id), value);
 }

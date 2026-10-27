@@ -9,6 +9,8 @@ interface HeaderProps {
 export function Header({ onBackToMenu }: HeaderProps) {
     const game = useGameStore((state) => state.game);
     const reset = useGameStore((state) => state.reset);
+    const currentScreen = useGameStore((state) => state.currentScreen);
+    const setScreen = useGameStore((state) => state.setScreen);
     const monthLabel = game
         ? new Date(game.year, game.month - 1, 1).toLocaleDateString('pt-BR', {
             month: 'long',
@@ -45,12 +47,22 @@ export function Header({ onBackToMenu }: HeaderProps) {
                 </div>
             </div>
 
-            <div className={styles.navBar}>
-                <a href="#">Dashboard</a>
-                <a href="#">Economia</a>
-                <a href="#">Política</a>
-                <a href="#">Social</a>
-            </div>
+            <nav className={styles.navBar}>
+                <button
+                    type="button"
+                    className={`${styles.navLink} ${currentScreen === 'dashboard' ? styles.active : ''}`}
+                    onClick={() => setScreen('dashboard')}
+                >
+                    Dashboard
+                </button>
+                <button
+                    type="button"
+                    className={`${styles.navLink} ${currentScreen === 'politicas' ? styles.active : ''}`}
+                    onClick={() => setScreen('politicas')}
+                >
+                    Políticas
+                </button>
+            </nav>
         </header>
     );
 }

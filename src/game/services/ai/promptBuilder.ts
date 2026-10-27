@@ -1,5 +1,5 @@
 import { INDICATORS, INDICATOR_IDS } from '../../data/indicators';
-import { GROUP_IDS } from '../../data/groups';
+import { GROUPS } from '../../data/groups';
 import { INSTRUMENTS } from '../../data/catalog';
 import type {
   PolicyContext,
@@ -7,16 +7,16 @@ import type {
   ProfileContext,
 } from '../../types/ai';
 
+const GROUP_IDS = GROUPS.map((g) => g.id);
+
 const CATEGORY_LABEL: Record<string, string> = {
-  economia: 'Economia',
+  economia: 'Economia e finanças públicas',
   saude: 'Saúde',
   educacao: 'Educação',
-  seguranca: 'Segurança',
-  infraestrutura: 'Infraestrutura',
   social: 'Social',
-  ambiente: 'Meio Ambiente',
-  gestao: 'Gestão',
-  politica: 'Política',
+  seguranca: 'Segurança pública',
+  energia: 'Energia',
+  cultura: 'Cultura',
 };
 
 // ============================================================
@@ -166,12 +166,11 @@ Seja proporcional à proposta. Para propostas vagas, escolha instrumento conserv
 
 function groupIndicatorList(): string {
   const byCat: Record<string, string[]> = {};
-  for (const id of INDICATOR_IDS) {
-    const ind = INDICATORS[id];
-    (byCat[ind.category] ??= []).push(`\`${id}\` (${ind.name})`);
+  for (const ind of INDICATORS) {
+    (byCat[ind.category] ??= []).push(`\`${ind.id}\` (${ind.nome})`);
   }
   return Object.entries(byCat)
-    .map(([cat, items]) => `### ${CATEGORY_LABEL[cat] ?? cat}\n${items.slice(0, 18).join(', ')}`)
+    .map(([cat, items]) => `### ${CATEGORY_LABEL[cat] ?? cat}\n${items.join(', ')}`)
     .join('\n\n');
 }
 
@@ -190,54 +189,24 @@ function formatProfile(p: ProfileContext): string {
 
 function formatNational(ctx: PolicyContext): string {
   const n = ctx.national;
-  const macro = n.macro
-    .map((m) => `  - ${m.id} (${m.label}): ${fmt(m.value)} ${m.unit} [${m.classification}, ${m.trend}${m.recentDelta ? `, Δ ${fmt(m.recentDelta)}` : ''}]`)
-    .join('\n');
-  const fiscal = n.fiscal
-    .map((f) => `  - ${f.id} (${f.label}): ${fmt(f.value)} ${f.unit} [${f.classification}, ${f.trend}]`)
+  const list = Object.entries(n.indicators)
+    .slice(0, 15)
+    .map(([id, val]) => `  - ${id}: ${fmt(val)}`)
     .join('\n');
   return [
     `Aprovação nacional: ${fmt(n.approval)} (${n.approvalTrend})`,
-    `Macros:`,
-    macro,
-    `Fiscal:`,
-    fiscal,
+    `Principais indicadores nacionais:`,
+    list,
   ].join('\n');
 }
 
-function formatStates(ctx: PolicyContext): string {
-  const highlighted = ctx.states.filter((s) => s.highlighted);
-  const others = ctx.states.filter((s) => !s.highlighted);
-
-  const lines: string[] = [];
-
-  if (highlighted.length > 0) {
-    lines.push('Estados MENCIONADOS na proposta:');
-    for (const s of highlighted) {
-      lines.push(
-        `  - ${s.id} ${s.name} (${s.region}): pop ${fmtBig(s.population)}, aprovação ${fmt(s.approval)}, inclinação ${fmt(s.politicalInclination)}`,
-      );
-    }
-  }
-
-  lines.push('Outros estados (resumo):');
-  const compact = others
-    .map((s) => `${s.id}(${s.region.slice(0, 3)}, ap=${fmt(s.approval, 0)})`)
-    .join(' ');
-  lines.push(`  ${compact}`);
-
-  return lines.join('\n');
+function formatStates(): string {
+  return 'Abrangência nacional (política aplicada em todo o território).';
 }
 
 function formatGroups(ctx: PolicyContext): string {
   return ctx.groups
-    .map((g) => {
-      const extra: string[] = [];
-      if (g.combativeness && g.combativeness !== 1) extra.push(`comb=${g.combativeness}`);
-      if (g.reaction?.active) extra.push(`EM REAÇÃO há ${g.reaction.monthsActive}m`);
-      const suffix = extra.length ? ` [${extra.join(', ')}]` : '';
-      return `  - ${g.id} (${g.name}): peso ${g.weight}, aprovação ${fmt(g.approval)}, lean ${fmt(g.lean)}${suffix}`;
-    })
+    .map((g) => `  - ${g.id} (${g.name}): influência ${g.weight}, aprovação ${fmt(g.approval)}%, alinhamento ${fmt(g.lean)}`)
     .join('\n');
 }
 
@@ -368,7 +337,7 @@ export function buildInitialPrompt(context: PolicyContext): string {
     formatCurrentIndicators(compactContext.national.indicators),
     '',
     '## Estados',
-    compactContext.states.length ? formatStates(compactContext) : 'Use abrangência nacional, salvo se a proposta citar um estado.',
+    formatStates(),
     '',
     '## Grupos sociais',
     formatGroups(compactContext),

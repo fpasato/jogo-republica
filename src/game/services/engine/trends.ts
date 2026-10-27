@@ -201,12 +201,9 @@ function lookupMeta(id: string, origin: Origin): IndicatorMeta | null {
     const macro = MACRO_BY_ID[id];
     if (!macro) return null;
     return {
-      label: macro.nome,
-      unit: macro.unidade,
-      direction:
-        macro.melhorQuando === 'subir'
-          ? 'higher_is_better'
-          : 'lower_is_better',
+      label: macro.name,
+      unit: macro.unit,
+      direction: 'neutral',
       theme: themeOf(id),
     };
   }
@@ -215,8 +212,8 @@ function lookupMeta(id: string, origin: Origin): IndicatorMeta | null {
   try {
     const ind = getIndicator(id);
     return {
-      label: ind.name,
-      unit: ind.unit,
+      label: ind.nome,
+      unit: ind.unidade,
       direction: ind.direction,
       theme: themeOf(id),
     };

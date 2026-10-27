@@ -3,7 +3,6 @@ import styles from './styles.module.css';
 
 import { Header } from '../../components/header';
 import { Footer } from '../../components/footer';
-import { NationalInfo } from './components/nationalInfo';
 import { PolicyCreator, type PendingPolicy } from './components/PolicyCreator';
 import { BrazilMap } from './components/BrazilMap';
 import { NewsHome } from './components/newshome';
@@ -11,14 +10,12 @@ import { VotingScreen } from './components/VotingScreen';
 import { STATES, STATE_IDS, type StateId } from '../../game/data/states';
 import { useGameStore } from '../../store/gameStore';
 import { runVoting, type VotingOutcome } from '../../game/services/parliament/votingService';
-import { runFeedPipeline } from '../../game/services/social/feedOrchestrator';
-import type { Noticia, Post } from '../../game/types/ai';
+import { pickNewsArticle } from '../../game/services/engine/newsPicker';
+import type { Noticia } from '../../game/types/ai';
 
 const LOADING_LABEL: Record<string, string> = {
   turn: 'Aplicando a medida e atualizando os indicadores…',
-  player_posts: 'Analisando a repercussão das publicações…',
-  news: 'Redigindo as notícias do mês…',
-  social: 'Preparando a repercussão nas redes…',
+  news: 'Preparando as notícias do mês…',
 };
 
 export function Home() {
@@ -36,12 +33,18 @@ export function Home() {
   const [loadingStage, setLoadingStage] = useState<string | null>(null);
   const [newsError, setNewsError] = useState<string | null>(null);
   const [noticias, setNoticias] = useState<Noticia[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
 
-  const mapStates = STATE_IDS.map((id) => ({
-    ...STATES[id],
-    approval: game?.stateApprovals[id] ?? game?.nationalApproval ?? 50,
-  }));
+  const mapStates = STATE_IDS.map((id) => {
+    const nat = game?.nationalApproval ?? 50;
+    const inc = STATES[id]?.politicalInclination ?? 0;
+    const govIdeology = game?.profile.govIdeology ?? 0;
+    const shift = -inc * (govIdeology / 3) * 8;
+    const approval = Math.min(100, Math.max(1, nat + shift));
+    return {
+      ...STATES[id],
+      approval,
+    };
+  });
 
   const startVoting = async (policy: PendingPolicy) => {
     setPolicyForVote(policy);
@@ -62,7 +65,7 @@ export function Home() {
     }
   };
 
-  const generateMonthlyFeed = async () => {
+  const generateMonthlyNews = () => {
     setNewsError(null);
     setLoadingStage('turn');
     const prepared = prepareMonth();
@@ -72,30 +75,14 @@ export function Home() {
     }
 
     try {
-      const result = await runFeedPipeline(
-        {
-          game: prepared.game,
-          history: prepared.game.history,
-          lastTurnLog: prepared.log,
-          lastTurnSummary: prepared.summary,
-          playerPostsFromLastTurn: [],
-          playerSeed: {
-            nome: prepared.game.profile.playerName,
-            handle: '@presidente',
-            ideology: prepared.game.profile.govIdeologyLabel ?? 'centro_esquerda',
-          },
-          socialPostCount: 10,
-        },
-        {
-          timeoutMs: 45_000,
-          maxAttempts: 1,
-          onProgress: (stage) => setLoadingStage(stage),
-        },
-      );
-      setNoticias(result.noticias);
-      setPosts(result.posts);
+      const noticia = pickNewsArticle({
+        month: prepared.game.month,
+        year: prepared.game.year,
+        nationalApproval: prepared.game.nationalApproval,
+        indicators: prepared.game.macros,
+      });
+      setNoticias([noticia]);
     } catch (error) {
-      // O mês é aplicado mesmo se houver uma falha inesperada no feed.
       commitPreparedMonth(prepared);
       throw error;
     }
@@ -128,7 +115,7 @@ export function Home() {
     setVoteOutcome(null);
     setLoadingStage('turn');
     try {
-      await generateMonthlyFeed();
+      generateMonthlyNews();
     } catch (error) {
       setNewsError(error instanceof Error ? error.message : 'Falha ao preparar o jornal deste mês.');
     } finally {
@@ -145,9 +132,9 @@ export function Home() {
     setVoteError(null);
   };
 
-  const advanceWithoutPolicy = async () => {
+  const advanceWithoutPolicy = () => {
     try {
-      await generateMonthlyFeed();
+      generateMonthlyNews();
     } catch (error) {
       setNewsError(error instanceof Error ? error.message : 'Falha ao preparar o jornal deste mês.');
     } finally {
@@ -158,16 +145,30 @@ export function Home() {
   return (
     <div className={styles.container}>
       <Header />
-      <NationalInfo />
-      <div className={styles.contentGrid}>
-        <PolicyCreator onConfirm={(policy) => { void startVoting(policy); }} onAdvanceMonth={advanceWithoutPolicy} />
-        <BrazilMap
-          states={mapStates}
-          selectedId={selectedState}
-          onSelect={setSelectedState}
-        />
-        <NewsHome noticias={noticias} posts={posts} isLoading={!!loadingStage} error={newsError} />
-      </div>
+
+      <main className={styles.contentGrid}>
+        {/* Coluna principal: ação + feedback */}
+        <div className={styles.mainColumn}>
+          <PolicyCreator
+            onConfirm={(policy) => { void startVoting(policy); }}
+            onAdvanceMonth={advanceWithoutPolicy}
+          />
+          <NewsHome
+            noticias={noticias}
+            isLoading={!!loadingStage}
+            error={newsError}
+          />
+        </div>
+
+        {/* Coluna lateral: contexto (mapa) — fica sticky ao rolar */}
+        <aside className={styles.sideColumn} aria-label="Situação por estado">
+          <BrazilMap
+            states={mapStates}
+            selectedId={selectedState}
+            onSelect={setSelectedState}
+          />
+        </aside>
+      </main>
 
       {votingOpen && (
         <VotingScreen

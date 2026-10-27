@@ -65,7 +65,7 @@ function indicatorLabel(id: string): {
 } {
   try {
     const ind = getIndicator(id);
-    return { nome: ind.name, unidade: ind.unit, direction: ind.direction };
+    return { nome: ind.nome, unidade: ind.unidade, direction: ind.direction };
   } catch {
     return { nome: id, unidade: '', direction: 'neutral' };
   }
@@ -122,14 +122,12 @@ function AnalysisBlock({ ai }: { ai: AIInterpretation }) {
   const beneficios = ai.beneficios ?? [];
   const riscos = ai.riscos ?? [];
   const colaterais = ai.efeitos_colaterais ?? [];
-  const alvos = ai.estados_alvo ?? [];
 
   const vazio =
     !objetivo &&
     !areaPrincipal &&
     secundarias.length === 0 &&
-    beneficios.length + riscos.length + colaterais.length === 0 &&
-    alvos.length === 0;
+    beneficios.length + riscos.length + colaterais.length === 0;
 
   if (vazio) return null;
 
@@ -141,7 +139,7 @@ function AnalysisBlock({ ai }: { ai: AIInterpretation }) {
         </p>
       )}
 
-      {(areaPrincipal || secundarias.length > 0 || alvos.length > 0) && (
+      {(areaPrincipal || secundarias.length > 0) && (
         <div className={styles.tags}>
           {areaPrincipal && (
             <span className={`${styles.tag} ${styles.tagPrimary}`}>
@@ -153,19 +151,7 @@ function AnalysisBlock({ ai }: { ai: AIInterpretation }) {
               {areaLabel(a)}
             </span>
           ))}
-          {alvos.length > 0 ? (
-            alvos.map((uf) => (
-              <span
-                key={uf}
-                className={styles.tag}
-                title="Estado citado na proposta"
-              >
-                📍 {stateLabel(uf)}
-              </span>
-            ))
-          ) : (
-            <span className={styles.tag}>Abrangência nacional</span>
-          )}
+          <span className={styles.tag}>Abrangência nacional</span>
         </div>
       )}
 

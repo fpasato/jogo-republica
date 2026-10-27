@@ -1,14 +1,17 @@
-import { GROUPS } from '../data/catalog';
+import { GROUPS } from '../data/groups';
 
-// Os grupos agora vivem SÓ em data/catalog.ts. Este arquivo apenas define o
-// formato do estado e um valor neutro de fallback (o jogo real usa
-// buildInitialGroups(perfil), em services/profileService.ts).
 export type SocialGroup = string;
 
 export interface GroupData {
-    id: SocialGroup;
-    name: string;
-    approval: number;
+  id: SocialGroup;
+  name: string;
+  approval: number;
+  influence: number;
 }
 
-export const initialGroups: GroupData[] = GROUPS.map((g) => ({ id: g.id, name: g.nome, approval: 50 }));
+export const initialGroups: GroupData[] = GROUPS.map((g) => ({
+  id: g.id,
+  name: g.nome,
+  approval: g.initialApproval,
+  influence: g.peso,
+}));

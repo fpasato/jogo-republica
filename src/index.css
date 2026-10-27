@@ -9,48 +9,29 @@
 
 
 :root {
-  /* Fundos */
-  --bg: #020406;
-  --surface: #101621;
+  /* Base */
+  --bg-void: #000000;
+  --bg-surface: #0A0A0A;
+  --bg-elevated: #141414;
+  --border: #262626;
+  --text: #F5F5F5;
+  --text-muted: #8A8A8A;
 
-  /* Bordas */
-  --border: #293A52;
-  --border-hover: #405775;
+  /* Verde */
+  --green-500: #22C55E;
+  --green-400: #4ADE80;
+  --green-300: #86EFAC;
+  --green-900: #052E16;
 
-  /* Textos */
-  --text: #F0F5FF;
-  --text-muted: #9AAAC4;
-  --text-subtle: #71839F;
+  /* Amarelo */
+  --yellow-500: #FACC15;
+  --yellow-400: #FDE047;
+  --yellow-300: #FEF08A;
+  --yellow-900: #422006;
 
-  /* Cor principal */
-  --accent: #10B981;
-  --accent-hover: #34D399;
-  --accent-pressed: #059669;
-  --on-accent: #03251B;
-
-  /* Cores complementares */
-  --blue: #38BDF8;
-  --blue-hover: #7DD3FC;
-  --purple: #A78BFA;
-  --purple-hover: #C4B5FD;
-  --amber: #FBBF24;
-  --coral: #FB7185;
-
-  /* Estados */
-  --success: #34D399;
-  --warning: #FBBF24;
-  --danger: #FB7185;
-  --info: #38BDF8;
-
-  /* Foco e interação */
-  --focus-ring: rgba(56, 189, 248, 0.45);
-  --accent-glow: rgba(16, 185, 129, 0.12);
-  --overlay-backdrop: rgba(2, 6, 15, 0.72);
-
-  /* Gráficos */
-  --chart-1: #10B981;
-  --chart-2: #38BDF8;
-  --chart-3: #A78BFA;
-  --chart-4: #FBBF24;
-  --chart-5: #FB7185;
+  /* Azul */
+  --blue-500: #3B82F6;
+  --blue-400: #60A5FA;
+  --blue-300: #93C5FD;
+  --blue-900: #172554;
 }

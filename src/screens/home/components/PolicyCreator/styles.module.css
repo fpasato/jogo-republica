@@ -1,334 +1,373 @@
 /* ============================================================
-   LAYOUT
+   PolicyCreator — Paleta "Neon Grid" (dark #000)
+   Sem glass, sem border-radius, sem blur
    ============================================================ */
 
+/* ═══════════ Container principal ═══════════ */
+
 .policyCreator {
+  --bg-void: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-elevated: #141414;
+  --border: #262626;
+  --border-strong: #3a3a3a;
+  --text: #f5f5f5;
+  --text-muted: #8a8a8a;
+  --text-dim: #5a5a5a;
+
+  --green-500: #22c55e;
+  --green-400: #4ade80;
+  --green-300: #86efac;
+  --green-900: #052e16;
+
+  --yellow-500: #facc15;
+  --yellow-400: #fde047;
+  --yellow-300: #fef08a;
+  --yellow-900: #422006;
+
+  --blue-500: #3b82f6;
+  --blue-400: #60a5fa;
+  --blue-300: #93c5fd;
+  --blue-900: #172554;
+
   display: flex;
   flex-direction: column;
   gap: 20px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "tnum" 1;
+  color: var(--text);
 }
+
+/* ═══════════ Painel (form container) ═══════════ */
 
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 22px;
-  background: var(--surface);
+  gap: 20px;
+  background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(2, 6, 15, 0.4);
+  border-left: 3px solid var(--green-500);
+  padding: 24px 26px;
+  position: relative;
 }
 
 .panelHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding-bottom: 14px;
+  gap: 16px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+.panelHeader::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 48px;
+  height: 2px;
+  background: var(--green-500);
 }
 
 .panelTitle {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--text);
-  letter-spacing: 0.2px;
 }
 
 .badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent);
-  background: var(--accent-glow);
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  letter-spacing: 0.4px;
+  color: var(--yellow-400);
+  border: 1px solid var(--yellow-500);
+  background: var(--yellow-900);
 }
 
-/* ============================================================
-   CONTADOR DE TENTATIVAS
-   ============================================================ */
+/* ═══════════ Contador de tentativas ═══════════ */
 
 .counter {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.counter[data-level='ok'] {
-  border-color: var(--border-hover);
-}
-
-.counter[data-level='warning'] {
-  border-color: var(--warning);
-  background: rgba(251, 191, 36, 0.08);
-}
-
-.counter[data-level='danger'] {
-  border-color: var(--danger);
-  background: rgba(251, 113, 133, 0.1);
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-void);
 }
 
 .counterDots {
   display: inline-flex;
-  align-items: center;
   gap: 4px;
 }
 
 .counterDot {
+  display: inline-block;
   width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--surface-3, var(--surface-2));
-  border: 1px solid var(--border-hover);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  height: 12px;
+  background: var(--border);
+  border: 1px solid var(--border-strong);
+  transition: background-color 180ms ease, border-color 180ms ease;
 }
 
-.counterDot[data-filled='true'] {
-  background: var(--accent);
-  border-color: var(--accent);
+.counterDot[data-filled="true"] {
+  background: var(--yellow-500);
+  border-color: var(--yellow-400);
 }
 
-.counter[data-level='warning'] .counterDot[data-filled='true'] {
-  background: var(--warning);
-  border-color: var(--warning);
+.counter[data-level="warning"] .counterDot[data-filled="true"] {
+  background: var(--yellow-500);
+  border-color: var(--yellow-400);
 }
 
-.counter[data-level='danger'] .counterDot[data-filled='true'] {
-  background: var(--danger);
-  border-color: var(--danger);
+.counter[data-level="danger"] .counterDot[data-filled="true"] {
+  background: var(--green-900);
+  border-color: var(--green-500);
+  box-shadow: inset 0 0 0 1px var(--green-500);
 }
 
 .counterText {
-  font-size: 0.78rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   color: var(--text-muted);
-  letter-spacing: 0.4px;
+  font-feature-settings: "tnum" 1;
 }
 
-.counter[data-level='warning'] .counterText {
-  color: var(--warning);
+.counter[data-level="danger"] .counterText {
+  color: var(--green-400);
 }
 
-.counter[data-level='danger'] .counterText {
-  color: var(--danger);
+.counter[data-level="warning"] .counterText {
+  color: var(--yellow-400);
 }
 
-/* ============================================================
-   CAMPOS
-   ============================================================ */
+/* ═══════════ Campos ═══════════ */
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .field label {
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--text-muted);
-  letter-spacing: 0.2px;
 }
 
-.field label span {
+.field label > span {
   font-weight: 400;
-  color: var(--text-subtle);
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--text-dim);
 }
 
 .field input,
 .field textarea {
-  width: 100%;
-  padding: 10px 12px;
-  font-family: inherit;
-  font-size: 0.9rem;
+  font: inherit;
+  font-size: 14px;
   color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  background: var(--bg-void);
+  border: 1px solid var(--border-strong);
+  padding: 12px 14px;
+  transition: border-color 140ms ease;
+  width: 100%;
+  box-sizing: border-box;
   resize: vertical;
+  font-family: inherit;
+}
+
+.field textarea {
+  line-height: 1.5;
+  min-height: 120px;
 }
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: var(--text-subtle);
+  color: var(--text-dim);
+}
+
+.field input:hover,
+.field textarea:hover {
+  border-color: var(--text-dim);
 }
 
 .field input:focus,
 .field textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--focus-ring);
+  outline: none;
+  border-color: var(--green-500);
 }
 
 .field input:disabled,
 .field textarea:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-/* ============================================================
-   BOTÕES
-   ============================================================ */
+/* ═══════════ Mensagens ═══════════ */
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--yellow-400);
+  background: rgba(250, 204, 21, 0.05);
+  border: 1px solid var(--yellow-500);
+  border-left-width: 4px;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.resumo {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  padding: 12px 14px;
+  background: var(--bg-void);
+  border-left: 2px solid var(--blue-500);
+}
+
+/* ═══════════ Ações (form) ═══════════ */
 
 .actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
   flex-wrap: wrap;
-  margin-top: 4px;
 }
+
+/* ═══════════ Botões ═══════════ */
 
 .primary,
 .ghost,
 .danger,
 .confirm {
-  padding: 9px 16px;
-  font-family: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  border-radius: 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 11px 18px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.primary,
-.confirm {
-  color: var(--on-accent);
-  background: var(--accent);
-}
-
-.primary:hover:not(:disabled),
-.confirm:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.primary:active:not(:disabled),
-.confirm:active:not(:disabled) {
-  background: var(--accent-pressed);
-}
-
-.ghost {
-  color: var(--text-muted);
-  background: transparent;
-  border-color: var(--border);
-}
-
-.ghost:hover:not(:disabled) {
-  color: var(--text);
-  border-color: var(--border-hover);
-  background: var(--surface-2);
-}
-
-.danger {
-  color: var(--danger);
-  background: transparent;
-  border-color: rgba(251, 113, 133, 0.3);
-}
-
-.danger:hover:not(:disabled) {
-  background: rgba(251, 113, 133, 0.1);
-  border-color: var(--danger);
+  transition: background-color 140ms ease, color 140ms ease,
+    border-color 140ms ease;
+  white-space: nowrap;
 }
 
 .primary:focus-visible,
 .ghost:focus-visible,
 .danger:focus-visible,
 .confirm:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--focus-ring);
+  outline: 2px solid var(--blue-400);
+  outline-offset: 2px;
 }
 
 .primary:disabled,
 .ghost:disabled,
 .danger:disabled,
 .confirm:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+}
+
+.primary {
+  background: var(--green-500);
+  color: #000;
+  border-color: var(--green-500);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--green-400);
+  border-color: var(--green-400);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-strong);
+}
+
+.ghost:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: var(--bg-elevated);
+}
+
+.danger {
+  background: transparent;
+  color: var(--yellow-500);
+  border-color: var(--yellow-500);
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--yellow-500);
+  color: #000;
+}
+
+.confirm {
+  background: var(--blue-500);
+  color: #fff;
+  border-color: var(--blue-500);
+}
+
+.confirm:hover:not(:disabled) {
+  background: var(--blue-400);
+  border-color: var(--blue-400);
 }
 
 .footerStart {
   margin-right: auto;
 }
 
-/* ============================================================
-   TEXTOS
-   ============================================================ */
-
-.error {
-  padding: 10px 12px;
-  margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.45;
-  color: var(--danger);
-  background: rgba(251, 113, 133, 0.08);
-  border: 1px solid rgba(251, 113, 133, 0.25);
-  border-radius: 8px;
-}
-
-.muted {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.resumo {
-  margin: 0 0 16px;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--text);
-}
-
-.positive {
-  color: var(--success);
-  font-weight: 600;
-}
-
-.negative {
-  color: var(--danger);
-  font-weight: 600;
-}
-
-.legal {
-  margin: 16px 0 0;
-  padding: 10px 12px;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: var(--text-muted);
-  background: var(--surface-2);
-  border-left: 3px solid var(--info);
-  border-radius: 6px;
-}
-
-/* ============================================================
-   BLOCO DE ANÁLISE
-   ============================================================ */
+/* ═══════════ Bloco de análise ═══════════ */
 
 .analysis {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 14px;
 }
 
 .analysis p {
   margin: 0;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
 }
+
+.analysis p strong {
+  color: var(--green-400);
+  font-weight: 700;
+}
+
+.analysis h4 {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ═══════════ Tags de área ═══════════ */
 
 .tags {
   display: flex;
@@ -337,122 +376,163 @@
 }
 
 .tag {
-  display: inline-flex;
-  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  letter-spacing: 0.3px;
+  color: var(--blue-400);
+  border: 1px solid var(--blue-500);
+  background: var(--blue-900);
 }
 
 .tagPrimary {
-  color: var(--on-accent);
-  background: var(--accent);
-  border-color: var(--accent);
+  color: #000;
+  background: var(--green-500);
+  border-color: var(--green-500);
 }
+
+/* ═══════════ Grid benefícios / riscos ═══════════ */
 
 .analysisGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  margin-top: 6px;
 }
 
-.analysisGrid h4 {
-  margin: 0 0 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+.analysisGrid > div {
+  background: var(--bg-void);
+  padding: 14px 16px;
 }
 
-/* ============================================================
-   LISTAS DE EFEITOS
-   ============================================================ */
+/* ═══════════ Lista de efeitos ═══════════ */
 
 .effectList {
   list-style: none;
-  margin: 0;
   padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 .effectList li {
-  padding: 6px 10px;
-  font-size: 0.875rem;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  padding-left: 12px;
+  position: relative;
 }
 
-/* ============================================================
-   INSTRUMENTO
-   ============================================================ */
+.effectList li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--green-500);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.effectList li strong {
+  color: var(--text);
+}
+
+.positive {
+  color: var(--green-400);
+  font-weight: 700;
+  font-feature-settings: "tnum" 1;
+}
+
+.negative {
+  color: var(--yellow-400);
+  font-weight: 700;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ═══════════ Instrumento ═══════════ */
 
 .instrument {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 12px 14px;
-  margin: 16px 0;
-  background: var(--surface-2);
+  background: var(--bg-void);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
+  border-left: 3px solid var(--blue-500);
 }
 
 .instrumentLabel {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  color: var(--text-dim);
 }
 
 .instrumentName {
-  font-size: 0.95rem;
-  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue-400);
+  letter-spacing: 0.04em;
 }
 
-/* ============================================================
-   TÍTULOS INTERNOS DO MODAL
-   ============================================================ */
-
-h4 {
-  margin: 18px 0 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: 0.2px;
+.instrument .muted {
+  flex-basis: 100%;
+  margin-top: 2px;
 }
 
-/* ============================================================
-   RESPONSIVO
-   ============================================================ */
+/* ═══════════ Legal ═══════════ */
 
-@media (max-width: 560px) {
+.legal {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg-void);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--yellow-500);
+}
+
+.legal strong {
+  color: var(--yellow-400);
+  font-weight: 700;
+}
+
+/* ═══════════ Heading hierarchy no modal ═══════════ */
+
+.analysis + h4,
+.analysis + p,
+.instrument + h4 {
+  margin-top: 16px;
+}
+
+/* ═══════════ Responsivo ═══════════ */
+
+@media (max-width: 640px) {
   .panel {
-    padding: 16px;
-  }
-
-  .panelHeader {
-    align-items: flex-start;
+    padding: 18px;
   }
 
   .actions {
     flex-direction: column-reverse;
+    align-items: stretch;
   }
 
   .actions > button {
     width: 100%;
+  }
+
+  .panelHeader {
+    flex-wrap: wrap;
+  }
+
+  .analysisGrid {
+    grid-template-columns: 1fr;
   }
 }

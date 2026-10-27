@@ -1,10 +1,9 @@
-import type { Noticia, Post } from '../../../../game/types/ai';
+import type { Noticia } from '../../../../game/types/ai';
 import placeholderImage from '../../../../game/assets/news/_placeholder.png';
 import styles from './styles.module.css';
 
 interface NewsHomeProps {
   noticias: Noticia[];
-  posts?: Post[];
   isLoading?: boolean;
   error?: string | null;
 }
@@ -15,13 +14,13 @@ const TONE_LABEL = {
   negativo: 'Negativa',
 } as const;
 
-export function NewsHome({ noticias, posts = [], isLoading = false, error }: NewsHomeProps) {
+export function NewsHome({ noticias, isLoading = false, error }: NewsHomeProps) {
   return (
     <section className={styles.container} aria-labelledby="news-home-title">
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Acompanhe o país</p>
-          <h2 id="news-home-title">Jornal e redes</h2>
+          <h2 id="news-home-title">Jornal</h2>
         </div>
         {isLoading && <span className={styles.status}>Atualizando…</span>}
       </header>
@@ -60,18 +59,6 @@ export function NewsHome({ noticias, posts = [], isLoading = false, error }: New
             </article>
           ))}
         </div>
-      )}
-
-      {posts.length > 0 && (
-        <section className={styles.social} aria-labelledby="social-feed-title">
-          <h3 id="social-feed-title">Repercussão nas redes</h3>
-          {posts.slice(0, 6).map((post) => (
-            <article className={styles.post} key={post.id}>
-              <p>{post.texto}</p>
-              <span>{post.stats.likes.toLocaleString('pt-BR')} curtidas · {post.stats.reposts.toLocaleString('pt-BR')} compartilhamentos</span>
-            </article>
-          ))}
-        </section>
       )}
     </section>
   );

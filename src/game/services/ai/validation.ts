@@ -1,6 +1,6 @@
 import { FISCAL_MAGNITUDE_REAIS, INSTRUMENTS, type InstrumentId } from '../../data/catalog';
-import { INDICATORS } from '../../data/indicators';
-import { GROUP_BY_ID } from '../../data/groups';
+import { INDICATORS_BY_ID } from '../../data/indicators';
+import { GROUPS_BY_ID } from '../../data/groups';
 import { STATE_IDS, type StateId } from '../../data/states';
 import { VALID_QUERY_TYPES } from '../../data/queryCatalog';
 import type {
@@ -296,21 +296,6 @@ export function validateAnalysis(
     out.posicao_ideologica = Math.max(-3, Math.min(3, pos));
   }
 
-  if (Array.isArray(raw.estados_alvo) && raw.estados_alvo.length > 0) {
-    const valid = raw.estados_alvo.filter((s) =>
-      STATE_IDS.includes(s as StateId),
-    );
-    const invalid = raw.estados_alvo.filter(
-      (s) => !STATE_IDS.includes(s as StateId),
-    );
-    if (invalid.length > 0) {
-      warnings.push(`Estados inválidos removidos: ${invalid.join(', ')}.`);
-    }
-    out.estados_alvo = valid.length > 0 ? valid : undefined;
-  } else {
-    out.estados_alvo = undefined;
-  }
-
   const { groups, groupWarnings } = validateGroups(raw.grupos);
   out.grupos = enforceGroupTradeoffs(groups, opts.proposalText ?? '', raw.impacto_fiscal?.magnitude, warnings);
   warnings.push(...groupWarnings);
@@ -318,7 +303,6 @@ export function validateAnalysis(
   const { indicators, indicatorWarnings, indicatorRejected } =
     validateIndicators(raw.indicadores, {
       currentValues: opts.currentValues,
-      hasEstadoAlvo: !!out.estados_alvo,
     });
   out.indicadores = indicators;
   warnings.push(...indicatorWarnings);
@@ -380,7 +364,7 @@ function validateGroups(
   if (!raw || typeof raw !== 'object') return { groups: out, groupWarnings };
 
   for (const [id, val] of Object.entries(raw)) {
-    if (!GROUP_BY_ID[id]) {
+    if (!GROUPS_BY_ID[id]) {
       groupWarnings.push(`Grupo desconhecido removido: "${id}".`);
       continue;
     }
@@ -398,7 +382,6 @@ function validateGroups(
 
 interface ValidateIndicatorsOpts {
   currentValues?: Record<string, number>;
-  hasEstadoAlvo: boolean;
 }
 
 function validateIndicators(
@@ -418,7 +401,7 @@ function validateIndicators(
   }
 
   for (const [id, val] of Object.entries(raw)) {
-    const ind = INDICATORS[id];
+    const ind = INDICATORS_BY_ID[id];
 
     if (!ind) {
       indicatorRejected.push(`Indicador desconhecido: "${id}".`);
@@ -428,13 +411,6 @@ function validateIndicators(
     if (FISCAL_CONTROLLED.has(id)) {
       indicatorRejected.push(
         `Indicador "${id}" é controlado pelo impacto fiscal — removido.`,
-      );
-      continue;
-    }
-
-    if (opts.hasEstadoAlvo && ind.scope === 'national') {
-      indicatorRejected.push(
-        `Indicador "${id}" é nacional — ignorado em medida regional.`,
       );
       continue;
     }

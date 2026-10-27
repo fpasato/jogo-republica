@@ -26,31 +26,36 @@ const projection = geoIdentity().reflectY(true).fitSize([WIDTH, HEIGHT], geo);
 const pathGenerator = geoPath(projection);
 
 // ---------------------------------------------------------------------------
-// Escala de cor por aprovação (vermelho → amarelo → verde)
-// Intervalos de 10 pontos, cor "chapada" para leitura rápida no mapa.
+// Escala de cor por aprovação
+// Vermelho forte → claro | amarelo forte → claro | VERDE CLARO (55+) → neon
+// Acima de 55% vira verde claro, e vai ficando mais forte/brilhante.
 // ---------------------------------------------------------------------------
 type ApprovalStop = { min: number; color: string; label: string };
 
 export const APPROVAL_STOPS: ApprovalStop[] = [
-    { min: 0,  color: '#7f1d1d', label: '0–19% · Crítica' },
-    { min: 20, color: '#b91c1c', label: '20–29% · Muito ruim' },
-    { min: 30, color: '#dc2626', label: '30–39% · Ruim' },
-    { min: 40, color: '#ea580c', label: '40–49% · Instável' },
-    { min: 50, color: '#ca8a04', label: '50–59% · Neutra' },
-    { min: 60, color: '#65a30d', label: '60–69% · Boa' },
-    { min: 70, color: '#16a34a', label: '70–79% · Ótima' },
-    { min: 80, color: '#15803d', label: '80–100% · Excelente' },
+    { min: 0,  color: '#991b1b', label: '0–9% · Crítica' },       // vermelho forte
+    { min: 10, color: '#dc2626', label: '10–19% · Muito ruim' },  // vermelho vivo
+    { min: 20, color: '#f87171', label: '20–29% · Ruim' },        // vermelho claro
+    { min: 30, color: '#fee2e2', label: '30–39% · Instável' },    // vermelho quase branco
+
+    { min: 40, color: '#ca8a04', label: '40–49% · Frágil' },      // amarelo forte
+    { min: 50, color: '#facc15', label: '50–54% · Neutra' },      // amarelo vivo
+
+    { min: 55, color: '#bbf7d0', label: '55–64% · Verde claro' }, // ⭐ verde clarinho
+    { min: 65, color: '#4ade80', label: '65–74% · Boa' },         // verde vivo
+    { min: 75, color: '#22c55e', label: '75–84% · Ótima' },       // verde forte
+    { min: 85, color: '#16a34a', label: '85–94% · Excelente' },   // verde muito forte
+    { min: 95, color: '#00e676', label: '95–100% · Plena' },      // verde neon (brilhante)
 ];
 
 export function approvalColor(approval: number): string {
-    // percorre de trás pra frente para pegar o maior "min" que ainda cabe
     for (let i = APPROVAL_STOPS.length - 1; i >= 0; i--) {
         if (approval >= APPROVAL_STOPS[i].min) return APPROVAL_STOPS[i].color;
     }
     return APPROVAL_STOPS[0].color;
 }
 
-const EMPTY_COLOR = '#101a27';
+const EMPTY_COLOR = '#141414';
 
 export type BrazilMapState = StateStructural & { approval: number };
 
@@ -121,6 +126,7 @@ export function BrazilMap({
                     const data = uf ? stateById.get(uf) : undefined;
                     const isSelected = !!uf && uf === selectedId;
                     const isHovered = !!uf && hoverUf === uf;
+                    const isExtreme = !!data && (data.approval < 10 || data.approval >= 95);
 
                     return (
                         <path
@@ -135,6 +141,7 @@ export function BrazilMap({
                                 .filter(Boolean)
                                 .join(' ')}
                             data-empty={!data ? 'true' : undefined}
+                            data-extreme={isExtreme ? 'true' : undefined}
                             onMouseEnter={(e) => uf && handleEnter(uf, e)}
                             onMouseMove={handleMove}
                             onClick={() => uf && onSelect(uf)}
@@ -146,12 +153,16 @@ export function BrazilMap({
             {showLegend && (
                 <div className={styles.legend} aria-label="Escala de aprovação">
                     {APPROVAL_STOPS.map((stop) => (
-                        <div key={stop.min} className={styles.legendItem}>
+                        <div
+                            key={stop.min}
+                            className={styles.legendItem}
+                            title={stop.label}
+                        >
                             <span
                                 className={styles.legendSwatch}
                                 style={{ background: stop.color }}
                             />
-                            <span className={styles.legendLabel}>{stop.label}</span>
+                            <span className={styles.legendLabel}>{stop.min}%</span>
                         </div>
                     ))}
                 </div>
@@ -173,7 +184,7 @@ export function BrazilMap({
                     </div>
                     <div>
                         <span>População</span>
-                            <span>{(hoveredState.population / 1_000_000).toFixed(1)} mi</span>
+                        <span>{(hoveredState.population / 1_000_000).toFixed(1)} mi</span>
                     </div>
                     <div>
                         <span>Aprovação</span>
