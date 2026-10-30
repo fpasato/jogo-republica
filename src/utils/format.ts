@@ -30,6 +30,22 @@ export function numero(v: number, casas: number): string {
   });
 }
 
+/** Formata valor monetário grande abreviando (tri / bi / mi). */
+function moedaGrande(abs: number, sinal = ''): string {
+  if (abs >= 1e12) return `${sinal}R$ ${numero(abs / 1e12, 2)} tri`;
+  if (abs >= 1e9) return `${sinal}R$ ${numero(abs / 1e9, 1)} bi`;
+  if (abs >= 1e6) return `${sinal}R$ ${numero(abs / 1e6, 0)} mi`;
+  return `${sinal}R$ ${numero(abs, 0)}`;
+}
+
+/** Detecta se a unidade indica valor monetário (ex: 'R$', 'R$/hab/ano'). */
+function unidadeMonetaria(unidade: string | undefined): { eh: boolean; sufixo: string } {
+  const u = unidade ?? '';
+  if (!/R\$/.test(u)) return { eh: false, sufixo: '' };
+  const sufixo = u.replace(/^R\$\s*/, '').trim();
+  return { eh: true, sufixo };
+}
+
 export function formatarValorIndicador(def: IndicatorDef, valor: number | undefined): string {
   if (valor === undefined || !Number.isFinite(valor)) return '—';
 
@@ -39,12 +55,8 @@ export function formatarValorIndicador(def: IndicatorDef, valor: number | undefi
     case 'currency_month':
       return `R$ ${numero(valor, 0)}/mês`;
     case 'currency_year': {
-      const abs = Math.abs(valor);
       const sign = valor < 0 ? '−' : '';
-      if (abs >= 1e12) return `${sign}R$ ${numero(abs / 1e12, 2)} tri`;
-      if (abs >= 1e9) return `${sign}R$ ${numero(abs / 1e9, 1)} bi`;
-      if (abs >= 1e6) return `${sign}R$ ${numero(abs / 1e6, 0)} mi`;
-      return `${sign}R$ ${numero(abs, 0)}`;
+      return moedaGrande(Math.abs(valor), sign);
     }
     case 'currency_unit':
       return `R$ ${numero(valor, 2)}`;
@@ -58,8 +70,15 @@ export function formatarValorIndicador(def: IndicatorDef, valor: number | undefi
       return `${numero(valor, 1)} /100 mil hab.`;
     case 'count':
       return `${numero(valor, 0)}`;
-    default:
-      return `${numero(valor, 1)} ${def.unidade}`;
+    default: {
+      const { eh, sufixo } = unidadeMonetaria(def.unidade);
+      if (eh) {
+        const sign = valor < 0 ? '−' : '';
+        const formatted = moedaGrande(Math.abs(valor), sign);
+        return sufixo ? `${formatted}${sufixo}` : formatted;
+      }
+      return `${numero(valor, 1)} ${def.unidade ?? ''}`.trim();
+    }
   }
 }
 
@@ -72,19 +91,24 @@ export function formatarDeltaIndicador(def: IndicatorDef, delta: number | null):
 
   switch (def.formatKind) {
     case 'percent':
+      if (abs < 0.05) return 'estável';
       return `${sinal}${numero(abs, 1)} p.p.`;
     case 'currency_year':
-      if (abs >= 1e12) return `${sinal}R$ ${numero(abs / 1e12, 2)} tri`;
-      if (abs >= 1e9) return `${sinal}R$ ${numero(abs / 1e9, 1)} bi`;
-      return `${sinal}R$ ${numero(abs / 1e6, 0)} mi`;
+      return moedaGrande(abs, sinal);
     case 'currency_month':
       return `${sinal}R$ ${numero(abs, 0)}`;
     case 'currency_unit':
       return `${sinal}R$ ${numero(abs, 2)}`;
     case 'score':
       return `${sinal}${numero(abs, 1)} pts`;
-    default:
-      return `${sinal}${numero(abs, 1)} ${def.unidade}`;
+    default: {
+      const { eh, sufixo } = unidadeMonetaria(def.unidade);
+      if (eh) {
+        const formatted = moedaGrande(abs, sinal);
+        return sufixo ? `${formatted}${sufixo}` : formatted;
+      }
+      return `${sinal}${numero(abs, 1)} ${def.unidade ?? ''}`.trim();
+    }
   }
 }
 

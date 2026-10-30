@@ -7,7 +7,7 @@ import { PolicyCreator, type PendingPolicy } from './components/PolicyCreator';
 import { BrazilMap } from './components/BrazilMap';
 import { NewsHome } from './components/newshome';
 import { VotingScreen } from './components/VotingScreen';
-import { STATES, STATE_IDS, type StateId } from '../../game/data/states';
+import { STATES, STATE_IDS, stateApprovalShift, type StateId } from '../../game/data/states';
 import { useGameStore } from '../../store/gameStore';
 import { runVoting, type VotingOutcome } from '../../game/services/parliament/votingService';
 import { pickNewsArticle } from '../../game/services/engine/newsPicker';
@@ -22,6 +22,7 @@ export function Home() {
   const game = useGameStore((state) => state.game);
   const saveId = useGameStore((state) => state.saveId);
   const confirmProposal = useGameStore((state) => state.confirmProposal);
+  const recordRejectedProposal = useGameStore((state) => state.recordRejectedProposal);
   const discardProposal = useGameStore((state) => state.discardProposal);
   const prepareMonth = useGameStore((state) => state.prepareMonth);
   const commitPreparedMonth = useGameStore((state) => state.commitPreparedMonth);
@@ -37,26 +38,7 @@ export function Home() {
   const mapStates = STATE_IDS.map((id) => {
     const state = STATES[id];
     const nat = game?.nationalApproval ?? 50;
-    const govIdeology = game?.profile.govIdeology ?? 0; // -3 (esquerda) a +3 (direita)
-
-    // Ajuste regional estrutural:
-    // Sul e Sudeste têm histórico mais liberal/conservador (direita)
-    // Norte e Nordeste têm histórico mais trabalhista/redistributivo (esquerda)
-    // Centro-Oeste é fortemente agro/conservador (direita)
-    let regionalLean = 0;
-    if (state.region === 'Sul') regionalLean = 0.55;
-    else if (state.region === 'Sudeste') regionalLean = 0.35;
-    else if (state.region === 'Centro-Oeste') regionalLean = 0.60;
-    else if (state.region === 'Nordeste') regionalLean = -0.65;
-    else if (state.region === 'Norte') regionalLean = -0.20;
-
-    // Combina inclinação específica do estado com o alinhamento regional
-    const totalLean = (state.politicalInclination * 0.5) + (regionalLean * 0.5);
-
-    // Se govIdeology for > 0 (direita): soma no Sul/Sudeste/CO e subtrai no Norte/Nordeste
-    // Se govIdeology for < 0 (esquerda): soma no Norte/Nordeste e subtrai no Sul/Sudeste
-    const shift = (govIdeology / 3) * totalLean * 16;
-    const approval = Math.min(100, Math.max(1, nat + shift));
+    const approval = game?.stateApprovals?.[id] ?? Math.min(100, Math.max(1, nat + stateApprovalShift(state, game?.profile.govIdeology ?? 0)));
     return {
       ...state,
       approval,
@@ -64,6 +46,7 @@ export function Home() {
   });
 
   const startVoting = async (policy: PendingPolicy) => {
+    discardProposal();
     setPolicyForVote(policy);
     setVoteOutcome(null);
     setVoteError(null);
@@ -108,10 +91,25 @@ export function Home() {
 
   const finishVoting = async (outcome: VotingOutcome) => {
     if (!outcome.approved) {
+      if (policyForVote) {
+        recordRejectedProposal({
+          text: policyForVote.originalText,
+          analysis: policyForVote.interpretation,
+          name: policyForVote.name,
+        });
+      }
       discardProposal();
       setVotingOpen(false);
-      setPolicyForVote(null);
       setVoteOutcome(null);
+      setLoadingStage('turn');
+      try {
+        generateMonthlyNews();
+      } catch (error) {
+        setNewsError(error instanceof Error ? error.message : 'Falha ao preparar o jornal deste mês.');
+      } finally {
+        setLoadingStage(null);
+        setPolicyForVote(null);
+      }
       return;
     }
 

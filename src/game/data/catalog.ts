@@ -100,15 +100,16 @@ export function quorumInfo(quorum: Quorum, totalSeats: number): { label: string;
   }
 }
 
+
 export const FISCAL_MAGNITUDE_REAIS: Record<number, number> = {
   0: 0,
-  1: 1e9,
-  2: 5e9,
-  3: 15e9,
-  4: 35e9,
-  5: 70e9,
-  6: 120e9,
-  7: 200e9,
+  1: 100e6,    // R$ 100 milhões
+  2: 500e6,    // R$ 500 milhões
+  3: 2e9,      // R$ 2 bilhões
+  4: 10e9,     // R$ 10 bilhões
+  5: 30e9,     // R$ 30 bilhões
+  6: 80e9,     // R$ 80 bilhões
+  7: 200e9,    // R$ 200 bilhões
 };
 
 export { GROUPS, type GroupDef, INDICATORS, type IndicatorDef };

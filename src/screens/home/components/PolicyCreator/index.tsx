@@ -6,10 +6,12 @@ import {
 } from '../../../../game/data/catalog';
 import { GROUPS } from '../../../../game/data/groups';
 import { getIndicator } from '../../../../game/data/indicators';
+import { INDICATORS_BY_ID } from '../../../../game/data/indicators';
+import { GROUP_SENSITIVITY } from '../../../../game/data/groupSensitivity';
 
 import type { AIInterpretation } from '../../../../game/types/ai';
-import { checkOllama } from '../../../../game/services/ai/ollamaClient';
 import { Modal } from './modal';
+import { Loading } from './loading';
 import styles from './styles.module.css';
 
 // ============================================================
@@ -17,24 +19,6 @@ import styles from './styles.module.css';
 // ============================================================
 
 const MAX_EDITS = 5;
-
-const RISK_LABEL: Record<string, string> = {
-  baixo: 'risco jurídico baixo',
-  medio: 'risco jurídico médio',
-  alto: 'risco jurídico alto',
-};
-
-const AXIS_LABEL: Record<string, string> = {
-  economia: 'Economia',
-  saude: 'Saúde',
-  educacao: 'Educação',
-  seguranca: 'Segurança',
-  infraestrutura: 'Infraestrutura',
-  social: 'Social',
-  ambiente: 'Meio Ambiente',
-  gestao: 'Gestão',
-  politica: 'Política',
-};
 
 // ============================================================
 // HELPERS
@@ -73,10 +57,6 @@ function indicatorLabel(id: string): {
 
 
 
-function areaLabel(id: string): string {
-  return AXIS_LABEL[id] ?? id;
-}
-
 // ============================================================
 // CONTADOR DE TENTATIVAS
 // ============================================================
@@ -114,83 +94,7 @@ function AttemptCounter({
 // ============================================================
 
 function AnalysisBlock({ ai }: { ai: AIInterpretation }) {
-  const objetivo = ai.objetivo;
-  const areaPrincipal = ai.area_principal;
-  const secundarias = ai.areas_secundarias ?? [];
-  const beneficios = ai.beneficios ?? [];
-  const riscos = ai.riscos ?? [];
-  const colaterais = ai.efeitos_colaterais ?? [];
-
-  const vazio =
-    !objetivo &&
-    !areaPrincipal &&
-    secundarias.length === 0 &&
-    beneficios.length + riscos.length + colaterais.length === 0;
-
-  if (vazio) return null;
-
-  return (
-    <div className={styles.analysis}>
-      {objetivo && (
-        <p>
-          <strong>Objetivo:</strong> {objetivo}
-        </p>
-      )}
-
-      {(areaPrincipal || secundarias.length > 0) && (
-        <div className={styles.tags}>
-          {areaPrincipal && (
-            <span className={`${styles.tag} ${styles.tagPrimary}`}>
-              {areaLabel(areaPrincipal)}
-            </span>
-          )}
-          {secundarias.map((a) => (
-            <span key={a} className={styles.tag}>
-              {areaLabel(a)}
-            </span>
-          ))}
-          <span className={styles.tag}>Abrangência nacional</span>
-        </div>
-      )}
-
-      {(beneficios.length > 0 ||
-        riscos.length > 0 ||
-        colaterais.length > 0) && (
-        <div className={styles.analysisGrid}>
-          {beneficios.length > 0 && (
-            <div>
-              <h4>Benefícios</h4>
-              <ul className={styles.effectList}>
-                {beneficios.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {riscos.length > 0 && (
-            <div>
-              <h4>Riscos</h4>
-              <ul className={styles.effectList}>
-                {riscos.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {colaterais.length > 0 && (
-            <div>
-              <h4>Efeitos colaterais</h4>
-              <ul className={styles.effectList}>
-                {colaterais.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  return <p className={styles.resumo}>{ai.interpretacao}</p>;
 }
 
 // ============================================================
@@ -247,7 +151,6 @@ export function PolicyCreator({
     setConnectionError(null);
     setAttemptsUsed((n) => n + 1);
     try {
-      await checkOllama();
       discardProposal();
       await analyzeProposal(proposalText);
     } catch (error) {
@@ -266,11 +169,6 @@ export function PolicyCreator({
     setPolicyName('');
     setProposalText('');
     setAttemptsUsed(0);
-  };
-
-  const handleDiscard = () => {
-    discardProposal();
-    resetForm();
   };
 
   const handleConfirm = () => {
@@ -319,9 +217,46 @@ export function PolicyCreator({
       : fiscal?.tipo === 'economia'
         ? fiscalMagnitude
         : 0;
+  const fiscalContextText = `${pending?.text ?? ''} ${fiscal?.nota ?? ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const isTaxMeasure = pending?.analysis.tipo_medida === 'imposto';
+  const isTaxRelief = /isenc|desoner|reduc|reduzir|cortar|extinguir/.test(fiscalContextText);
+  const fiscalLabel = fiscal?.tipo === 'economia'
+    ? (isTaxMeasure ? 'Arrecadação estimada' : 'Economia de gastos estimada')
+    : null;
+  const fiscalCostLabel = isTaxMeasure
+    ? (isTaxRelief ? 'Renúncia de receita estimada' : 'Custo de arrecadação')
+    : pending?.analysis.tipo_medida === 'programa' ? 'Orçamento do programa' : 'Custo estimado';
+  const fiscalNotEstimated = fiscal?.tipo === 'neutro' && /não estimada|não informado|não permite estimar/i.test(fiscal.nota);
 
   const grupos = pending?.analysis.grupos ?? {};
   const indicadores = pending?.analysis.indicadores ?? {};
+  const cardEffects = (pending?.analysis.novosIndicadores ?? []).reduce<Record<string, number>>((all, card) => {
+    if (card.tipo !== 'slider') return all;
+    const change = (card.valorProposto ?? card.valorInicial) - card.valorInicial;
+    const scale = Math.max(1, card.affectScale ?? 1);
+    for (const [id, perUnit] of Object.entries(card.affects ?? {})) {
+      if (!INDICATORS_BY_ID[id]) continue;
+      all[id] = (all[id] ?? 0) + perUnit * change / scale;
+    }
+    return all;
+  }, {});
+  const shownIndicators = { ...indicadores, ...cardEffects };
+  const shownGroups: Record<string, number> = Object.keys(grupos).length > 0 ? grupos : Object.fromEntries(
+    Object.entries(GROUP_SENSITIVITY).map(([groupId, sensitivities]) => {
+      const impact = Object.entries(cardEffects).reduce((sum, [id, delta]) => {
+        const sensitivity = sensitivities[id] ?? 0;
+        const definition = INDICATORS_BY_ID[id];
+        if (!sensitivity || !definition) return sum;
+        const normalized = definition.formatKind === 'percent' || definition.formatKind === 'score'
+          ? delta
+          : delta / (Math.abs(definition.initial) || 1) * 12;
+        return sum + sensitivity * normalized;
+      }, 0);
+      return [groupId, Math.max(-15, Math.min(15, impact))];
+    }).filter(([, impact]) => typeof impact === 'number' && Math.abs(impact) >= 0.05)
+      .sort((a, b) => Math.abs(Number(b[1])) - Math.abs(Number(a[1])))
+      .slice(0, 5),
+  ) as Record<string, number>;
   const isFallback = !!pending?.analysis._fallback;
   const modalOpen = !!pending;
 
@@ -404,6 +339,10 @@ export function PolicyCreator({
           </div>
         </section>
       </div>
+      
+      {/* ⭐ NOVO: overlays de carregamento */}
+      <Loading open={isAnalyzing} variant="analyze" />
+      <Loading open={isAdvancing} variant="advance" />
 
       <Modal
         open={modalOpen}
@@ -450,14 +389,6 @@ export function PolicyCreator({
                   Voltar e reescrever
                 </button>
               )}
-              <button
-                type="button"
-                className={styles.danger}
-                onClick={handleDiscard}
-                disabled={busy}
-              >
-                Descartar
-              </button>
               {!testMode && (
                 <button
                   type="button"
@@ -476,65 +407,53 @@ export function PolicyCreator({
           <>
             <p className={styles.error}>{pending.analysis.interpretacao}</p>
             <p className={styles.muted}>
-              A proposta não foi enviada para votação. Confira o Ollama e
-              tente novamente.
+              {pending.analysis.interpretacao.includes('429')
+                ? 'Limite temporário da Groq. Aguarde um minuto e tente novamente.'
+                : 'A proposta não foi enviada para votação. Confira o erro acima e tente novamente.'}
             </p>
           </>
         )}
 
         {pending && !isFallback && instrument && (
           <>
-            <p className={styles.resumo}>
-              {pending.analysis.interpretacao}
-            </p>
+            <h2 className={styles.resumo}>{pending.analysis.titulo || 'Medida proposta'}</h2>
+            <p><strong>Tipo: </strong>{pending.analysis.tipo_medida === 'imposto' ? 'Imposto' : pending.analysis.tipo_medida === 'beneficio' ? 'Benefício' : pending.analysis.tipo_medida === 'programa' ? 'Programa' : 'Medida'}</p>
 
             <AnalysisBlock ai={pending.analysis} />
 
             <div className={styles.instrument}>
-              <span className={styles.instrumentLabel}>Vira</span>
+              <span className={styles.instrumentLabel}>Instrumento</span>
               <strong className={styles.instrumentName}>
                 {instrument.label}
               </strong>
               <span className={styles.muted}>{instrument.regra}</span>
             </div>
 
-            <h4>Instrumento</h4>
-            <p>
-              {pending.analysis.motivo_instrumento || instrument.quandoUsar}
-            </p>
+            {pending.analysis.motivo_instrumento && pending.analysis.motivo_instrumento !== instrument.regra && (
+              <p className={styles.muted}>{pending.analysis.motivo_instrumento}</p>
+            )}
 
             <h4>Impacto fiscal</h4>
             <p>
               <strong>
-                {fiscal?.tipo === 'neutro' && 'Neutro'}
+                {fiscalNotEstimated && pending?.analysis.tipo_medida === 'imposto' && 'Arrecadação não estimada'}
+                {fiscalNotEstimated && pending?.analysis.tipo_medida !== 'imposto' && 'Impacto fiscal não estimado'}
+                {!fiscalNotEstimated && fiscal?.tipo === 'neutro' && 'Neutro'}
                 {fiscal?.tipo === 'custo' &&
-                  `Custo de ${formatBRL(Math.abs(fiscalAnual))} por ano`}
+                  `${fiscalCostLabel} de ${formatBRL(Math.abs(fiscalAnual))} por ano`}
                 {fiscal?.tipo === 'economia' &&
-                  `Economia de ${formatBRL(Math.abs(fiscalAnual))} por ano`}
+                  `${fiscalLabel} de ${formatBRL(Math.abs(fiscalAnual))} por ano`}
               </strong>
               {fiscal?.nota && (
                 <span className={styles.muted}> · {fiscal.nota}</span>
               )}
             </p>
 
-            {pending.analysis.intensidade > 0 && (
-              <>
-                <h4>
-                  {instrument.vigoraAoAssinar
-                    ? 'Choque ao assinar'
-                    : 'Choque no dia em que virar lei'}
-                </h4>
-                <p className={styles.muted}>
-                  Intensidade {pending.analysis.intensidade} de 3.
-                </p>
-              </>
-            )}
-
-            {Object.keys(grupos).length > 0 && (
+            {Object.keys(shownGroups).length > 0 && (
               <>
                 <h4>Efeito esperado nos grupos</h4>
                 <ul className={styles.effectList}>
-                  {Object.entries(grupos).map(([gid, delta]) => (
+                  {Object.entries(shownGroups).map(([gid, delta]) => (
                     <li key={gid}>
                       <strong>{groupName(gid)}</strong>:{' '}
                       <span
@@ -552,11 +471,11 @@ export function PolicyCreator({
               </>
             )}
 
-            {Object.keys(indicadores).length > 0 && (
+            {Object.keys(shownIndicators).length > 0 && (
               <>
-                <h4>Efeitos estimados nos indicadores</h4>
+                <h4>Atributos calculados afetados</h4>
                 <ul className={styles.effectList}>
-                  {Object.entries(indicadores).map(([iid, delta]) => {
+                  {Object.entries(shownIndicators).map(([iid, delta]) => {
                     const info = indicatorLabel(iid);
                     const bom =
                       info.direction === 'higher_is_better'
@@ -583,16 +502,6 @@ export function PolicyCreator({
                   })}
                 </ul>
               </>
-            )}
-
-            {pending.analysis.assessoria_juridica && (
-              <p className={styles.legal}>
-                <strong>Assessoria jurídica:</strong>{' '}
-                {pending.analysis.assessoria_juridica}{' '}
-                <span className={styles.muted}>
-                  ({RISK_LABEL[pending.analysis.risco_juridico]})
-                </span>
-              </p>
             )}
 
             {!testMode && (

@@ -62,13 +62,13 @@ export function NewGameForm({
 
             <div className={styles.formSection}>
                 <label htmlFor="gov-name" className={styles.sliderLabel}>
-                    Nome do governo
+                    Nome do Presidente
                 </label>
                 <input
                     id="gov-name"
                     className={styles.input}
                     type="text"
-                    placeholder="Ex: Governo da Reconstrução"
+                    placeholder="Ex: Fulano da Silva"
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
                 />

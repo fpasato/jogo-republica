@@ -11,6 +11,7 @@ import type {
   HistoryContext,
   NationalContext,
 } from '../../types/ai';
+import { INDICATORS } from '../../data/indicators';
 
 const HISTORY_MONTHS = 6;
 
@@ -80,6 +81,7 @@ function buildActivePolicyContexts(
       activeMonths: active,
       monthsToFullEffect,
       affectedIndicators,
+      newIndicators: p.newIndicators ?? [],
       affectedGroups,
       fiscalAnnual: p.fiscalAnnual,
     };
@@ -113,9 +115,35 @@ function buildHistoryContext(history: ContextSnapshot[]): HistoryContext {
 }
 
 export function buildContext(input: ContextInput): PolicyContext {
+  const compactIds = new Set([
+    'aprovacao_popular', 'crescimento_pib', 'inflacao', 'desemprego', 'divida_pib',
+    'taxa_pobreza', 'gini', 'idh', 'homicidios', 'esperanca_vida',
+    'ideb_ensino_medio', 'saldo_orcamentario', 'risco_pais', 'produtividade',
+  ]);
+  const proposal = input.proposal.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const categories: Array<[string, RegExp]> = [
+    ['economia', /impost|tribut|inflac|preco|pib|emprego|salario|empresa|econom|juros|selic|cambio|dolar|arrecad|orcament|fiscal|gasto|divida/],
+    ['saude', /saude|sus|hospital|medic|vacina|doenca|leito|mortalidade|enferm|upa/],
+    ['educacao', /escol|alun|avali|aprendiz|professor|educa|estud|ideb|analfabet|creche|pisa/],
+    ['social', /famil|benef|renda|pobre|moradia|habitac|assistencia|desigual|bolsa|gini|idh/],
+    ['seguranca', /crime|criminal|polic|prisao|seguranca|violencia|homicid|justica|penal/],
+    ['energia', /energia|eletric|renovavel|solar|eolic|tarifa|usina/],
+    ['infraestrutura', /infraestrutura|rodovia|ferrovia|porto|saneamento|esgoto|transporte|agua|logistic/],
+    ['meio_ambiente', /ambient|desmat|poluic|emisso|floresta|clima|reciclagem|amazonia|cerrado/],
+    ['ciencia_tecnologia', /ciencia|tecnolog|pesquisa|inova|patente|startup|digital|internet/],
+    ['administracao', /administra|burocracia|transparen|corrupcao|licitac|servidor|digitaliz/],
+    ['cultura', /cultur|museu|arte|patrimonio|audiovisual|cinema|teatro|acervo/],
+  ];
+  const relevant = new Set(categories.filter(([, pattern]) => pattern.test(proposal)).map(([category]) => category));
+  for (const indicator of INDICATORS) {
+    if (relevant.has(indicator.category) && indicator.type === 'calculated') compactIds.add(indicator.id);
+  }
+  const compactIndicators = Object.fromEntries(
+    Object.entries(input.nationalIndicators).filter(([id]) => compactIds.has(id)),
+  );
   const currentSnapshot: ContextSnapshot = {
     month: input.month,
-    national: input.nationalIndicators,
+    national: compactIndicators,
     macros: input.macros,
     groupApprovals: input.groupApprovals,
     nationalApproval: input.nationalApproval,
@@ -128,7 +156,7 @@ export function buildContext(input: ContextInput): PolicyContext {
     proposal: input.proposal,
     month: input.month,
     profile: input.profile,
-    national: buildNationalContext(input, trimmed),
+    national: buildNationalContext({ ...input, nationalIndicators: compactIndicators }, trimmed),
     states: [],
     groups: buildGroupSummaries(input),
     activePolicies: buildActivePolicyContexts(input.activePolicies),

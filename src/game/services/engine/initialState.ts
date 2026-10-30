@@ -1,7 +1,7 @@
 // src/game/services/engine/initialState.ts
 
 import { INDICATORS } from '../../data/indicators';
-import { initialMacroValues } from '../../data/macroIndicators';
+import { initialMacroValues, MACRO_INDICATORS } from '../../data/macroIndicators';
 import { GROUPS } from '../../data/groups';
 import {
   computeGroupBaseline,
@@ -9,8 +9,9 @@ import {
   clampApproval,
 } from './approval';
 import type { ProfileContext, ContextSnapshot } from '../../types/ai';
-import type { ActivePolicy } from '../../types/policy';
+import type { ActivePolicy, PolicyHistoryEntry } from '../../types/policy';
 import { PROFILE_AXES } from '../../data/profile';
+import { STATES, STATE_IDS, stateApprovalShift } from '../../data/states';
 
 export interface GameState {
   year: number;
@@ -20,7 +21,9 @@ export interface GameState {
   macros: Record<string, number>;
   groupApprovals: Record<string, number>;
   nationalApproval: number;
+  stateApprovals: Record<string, number>;
   activePolicies: ActivePolicy[];
+  measureHistory: PolicyHistoryEntry[];
   policyHistory: { monthIndex: number; id: string }[];
   lastModifiedIndicatorMonth?: number;
   history: ContextSnapshot[];
@@ -58,11 +61,17 @@ export function buildInitialState(opts: InitialStateOptions = {}): GameState {
     nationalIndicators[ind.id] = ind.initial;
   }
 
-  // 2. Macros
+  // 2. Macros - usar valores dos indicadores nacionais
   const macros = initialMacroValues();
   for (const k of Object.keys(macros)) {
     if (nationalIndicators[k] !== undefined) {
       macros[k] = nationalIndicators[k];
+    }
+  }
+  // Garantir que macros tenha todos os valores definidos
+  for (const m of MACRO_INDICATORS) {
+    if (macros[m.id] === undefined || macros[m.id] === 0) {
+      macros[m.id] = m.initial;
     }
   }
 
@@ -81,6 +90,11 @@ export function buildInitialState(opts: InitialStateOptions = {}): GameState {
   const nationalApproval = computeNationalApproval(groupApprovals);
   nationalIndicators.aprovacao_popular = nationalApproval;
 
+  const stateApprovals = Object.fromEntries(STATE_IDS.map((id) => {
+    const state = STATES[id];
+    return [id, clampApproval(nationalApproval + stateApprovalShift(state, profile.govIdeology))];
+  }));
+
   return {
     year: 2026,
     month,
@@ -89,7 +103,9 @@ export function buildInitialState(opts: InitialStateOptions = {}): GameState {
     macros,
     groupApprovals,
     nationalApproval,
+    stateApprovals,
     activePolicies: [],
+    measureHistory: [],
     policyHistory: [],
     lastModifiedIndicatorMonth: undefined,
     history: [],

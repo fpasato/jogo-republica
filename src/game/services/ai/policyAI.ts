@@ -7,11 +7,14 @@ import {
 import { runQueries, type QueryState } from './queryService';
 import { processResponse, fallbackAnalysis } from './validation';
 import {
-  chat,
-  OllamaError,
-  DEFAULT_MODEL,
+  chat as groqChat,
+  GroqError,
   type ChatMessage,
-} from './ollamaClient';
+} from './groqClient';
+import { chat as ollamaChat, DEFAULT_MODEL as DEFAULT_OLLAMA_MODEL, OllamaError } from './ollamaClient';
+
+const DEFAULT_MODEL = 'openai/gpt-oss-20b';
+
 import type {
   AIInterpretation,
   ContextInput,
@@ -62,13 +65,14 @@ export interface PolicyAIMetadata {
 
 export interface AttemptLogEntry {
   attempt: number;
+  provider?: 'groq' | 'ollama';
   temperature: number;
   outcome:
-    | 'ok'
-    | 'parse_error'
-    | 'query_then_error'
-    | 'network_error'
-    | 'cancelled';
+  | 'ok'
+  | 'parse_error'
+  | 'query_then_error'
+  | 'network_error'
+  | 'cancelled';
   error?: string;
   warnings: string[];
   rejected: string[];
@@ -89,11 +93,12 @@ export interface PolicyAIResult {
  *
  * Fluxo:
  *   1. buildContext
- *   2. buildInitialPayload → Ollama
+ *   2. buildInitialPayload → Groq
  *   3. processResponse
  *   4. Se query: runQueries → buildAnalysisPayload → Ollama (até N rodadas)
  *   5. Retry com temperatura decrescente em caso de falha estrutural
- *   6. Fallback se todas as tentativas falharem
+ *   6. Tenta Ollama local se a Groq falhar
+ *   7. Fallback simples se os dois provedores falharem
  *
  * Nunca lança. Sempre devolve `PolicyAIResult`.
  */
@@ -142,12 +147,13 @@ export async function analyzePolicy(
         context,
         queryState,
         currentValues,
+        provider: 'groq',
         model,
         temperature,
         maxQueryRounds,
         timeoutMs: options.timeoutMs ?? POLICY_TIMEOUT_MS,
-        numPredict: options.numPredict ?? 2000,
-        numCtx: 8192,
+        numPredict: options.numPredict ?? 2048,
+        numCtx: 4096,
         signal: options.signal,
       });
 
@@ -156,6 +162,7 @@ export async function analyzePolicy(
         totalQueryRounds += result.kind === 'query_then_error' ? result.queryRounds : 0;
         attemptLog.push({
           attempt: attempt + 1,
+          provider: 'groq',
           temperature,
           outcome: result.kind,
           error: result.error,
@@ -173,36 +180,38 @@ export async function analyzePolicy(
       applyQualityMetrics(result.analysis, input.proposal);
 
       attemptLog.push({
-          attempt: attempt + 1,
-          temperature,
-          outcome: 'ok',
-          warnings: result.warnings,
-          rejected: result.rejected,
-          durationMs: Date.now() - attemptStart,
-        });
+        attempt: attempt + 1,
+        provider: 'groq',
+        temperature,
+        outcome: 'ok',
+        warnings: result.warnings,
+        rejected: result.rejected,
+        durationMs: Date.now() - attemptStart,
+      });
 
       return {
-          analysis: result.analysis,
-          metadata: {
-            attempts: attempt + 1,
-            queryRounds: totalQueryRounds,
-            usedFallback: false,
-            totalDurationMs: Date.now() - start,
-            attemptLog,
-            promptTokens: totalPromptTokens,
-            responseTokens: totalResponseTokens,
-          },
+        analysis: result.analysis,
+        metadata: {
+          attempts: attempt + 1,
+          queryRounds: totalQueryRounds,
+          usedFallback: false,
+          totalDurationMs: Date.now() - start,
+          attemptLog,
+          promptTokens: totalPromptTokens,
+          responseTokens: totalResponseTokens,
+        },
       };
 
     } catch (err) {
-      const isOllama = err instanceof OllamaError;
+      const isProviderError = err instanceof GroqError || err instanceof OllamaError;
       const msg = err instanceof Error ? err.message : String(err);
       lastError = msg;
 
       attemptLog.push({
         attempt: attempt + 1,
+        provider: 'groq',
         temperature,
-        outcome: isOllama ? 'network_error' : 'parse_error',
+        outcome: isProviderError ? 'network_error' : 'parse_error',
         error: msg,
         warnings: [],
         rejected: [],
@@ -210,6 +219,80 @@ export async function analyzePolicy(
       });
 
       if (options.signal?.aborted) break;
+    }
+  }
+
+  // ---------- Provedor reserva: Ollama local ----------
+  if (!options.signal?.aborted) {
+    const attemptStart = Date.now();
+    const temperature = temperatures[temperatures.length - 1] ?? 0.1;
+    try {
+      const result = await runOneAttempt({
+        context,
+        queryState,
+        currentValues,
+        provider: 'ollama',
+        model: DEFAULT_OLLAMA_MODEL,
+        temperature,
+        maxQueryRounds,
+        timeoutMs: options.timeoutMs ?? POLICY_TIMEOUT_MS,
+        numPredict: options.numPredict ?? 2048,
+        numCtx: 8192,
+        signal: options.signal,
+      });
+
+      if (result.kind === 'success') {
+        applyQualityMetrics(result.analysis, input.proposal);
+        totalPromptTokens += result.promptTokens;
+        totalResponseTokens += result.responseTokens;
+        totalQueryRounds += result.queryRounds;
+        attemptLog.push({
+          attempt: attemptLog.length + 1,
+          provider: 'ollama',
+          temperature,
+          outcome: 'ok',
+          warnings: result.warnings,
+          rejected: result.rejected,
+          durationMs: Date.now() - attemptStart,
+        });
+        return {
+          analysis: result.analysis,
+          metadata: {
+            attempts: attemptLog.length,
+            queryRounds: totalQueryRounds,
+            usedFallback: false,
+            totalDurationMs: Date.now() - start,
+            attemptLog,
+            promptTokens: totalPromptTokens,
+            responseTokens: totalResponseTokens,
+          },
+        };
+      }
+
+      lastError = `${lastError}; Ollama: ${result.error}`;
+      attemptLog.push({
+        attempt: attemptLog.length + 1,
+        provider: 'ollama',
+        temperature,
+        outcome: result.kind,
+        error: result.error,
+        warnings: [],
+        rejected: [],
+        durationMs: Date.now() - attemptStart,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      lastError = `${lastError}; Ollama: ${msg}`;
+      attemptLog.push({
+        attempt: attemptLog.length + 1,
+        provider: 'ollama',
+        temperature,
+        outcome: err instanceof OllamaError ? 'network_error' : 'parse_error',
+        error: msg,
+        warnings: [],
+        rejected: [],
+        durationMs: Date.now() - attemptStart,
+      });
     }
   }
 
@@ -241,6 +324,7 @@ interface AttemptInput {
   context: PolicyContext;
   queryState: QueryState;
   currentValues: Record<string, number>;
+  provider: 'groq' | 'ollama';
   model: string;
   temperature: number;
   maxQueryRounds: number;
@@ -252,14 +336,14 @@ interface AttemptInput {
 
 type AttemptOutcome =
   | {
-      kind: 'success';
-      analysis: AIInterpretation;
-      warnings: string[];
-      rejected: string[];
-      queryRounds: number;
-      promptTokens: number;
-      responseTokens: number;
-    }
+    kind: 'success';
+    analysis: AIInterpretation;
+    warnings: string[];
+    rejected: string[];
+    queryRounds: number;
+    promptTokens: number;
+    responseTokens: number;
+  }
   | { kind: 'parse_error'; error: string; queryRounds: number }
   | { kind: 'query_then_error'; error: string; queryRounds: number };
 
@@ -268,6 +352,7 @@ async function runOneAttempt(input: AttemptInput): Promise<AttemptOutcome> {
     context,
     queryState,
     currentValues,
+    provider,
     model,
     temperature,
     maxQueryRounds,
@@ -288,7 +373,8 @@ async function runOneAttempt(input: AttemptInput): Promise<AttemptOutcome> {
     userChars: initialPayload.user.length,
     estimatedTokens: Math.round(promptChars / 4),
   });
-  const first = await callOllama(initialPayload, {
+  const first = await callProvider(initialPayload, {
+    provider,
     model,
     temperature,
     timeoutMs,
@@ -350,7 +436,8 @@ async function runOneAttempt(input: AttemptInput): Promise<AttemptOutcome> {
 
     // ---------- Chamada seguinte: pede análise com base nas consultas ----------
     const payload = buildAnalysisPayload(context, results);
-    const next = await callOllama(payload, {
+    const next = await callProvider(payload, {
+      provider,
       model,
       temperature,
       timeoutMs,
@@ -405,10 +492,11 @@ async function runOneAttempt(input: AttemptInput): Promise<AttemptOutcome> {
 }
 
 // ============================================================
-// CHAMADA AO OLLAMA
+// CHAMADA AO PROVEDOR DE IA
 // ============================================================
 
 interface CallOpts {
+  provider: 'groq' | 'ollama';
   model: string;
   temperature: number;
   timeoutMs?: number;
@@ -417,19 +505,22 @@ interface CallOpts {
   signal?: AbortSignal;
 }
 
-async function callOllama(payload: PromptPayload, opts: CallOpts) {
+async function callProvider(payload: PromptPayload, opts: CallOpts) {
   const messages: ChatMessage[] = [
     { role: 'system', content: payload.system },
     { role: 'user', content: payload.user },
   ];
-  return chat(messages, {
+  const options = {
     model: opts.model,
     temperature: opts.temperature,
     timeoutMs: opts.timeoutMs,
     numPredict: opts.numPredict,
     numCtx: opts.numCtx,
     signal: opts.signal,
-  });
+  };
+  return opts.provider === 'ollama'
+    ? ollamaChat(messages, options)
+    : groqChat(messages, options);
 }
 
 // ============================================================

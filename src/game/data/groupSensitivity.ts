@@ -14,6 +14,10 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     orcamento_seguranca: 0.3,
     saldo_orcamentario: 0.2,
     divida_publica: -0.2,
+    poder_compra: 0.25,
+    confianca_seguranca: 0.35,
+    resolucao_crimes: 0.25,
+    letalidade_policial: -0.2,
   },
   // Progressistas: desigualdade, educação, saúde, cultura, pobreza, sustentabilidade
   progressistas: {
@@ -28,6 +32,18 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     participacao_renovaveis: 0.4,
     investimento_energia: 0.3,
     bolsa_familia: 0.3,
+    cobertura_atencao_basica: 0.3,
+    disponibilidade_medicamentos: 0.3,
+    vacinacao: 0.2,
+    satisfacao_sus: 0.3,
+    inclusao_social: 0.4,
+    seguranca_alimentar: 0.4,
+    diversidade_cultural: 0.3,
+    participacao_cultural: 0.3,
+    preservacao_acervos: 0.2,
+    empregos_culturais: 0.25,
+    aprendizado_escolar: 0.3,
+    evasao_escolar: -0.3,
   },
   // Liberais econômicos: impostos, gastos, dívida, Selic, inflação, liberdade de mercado
   liberais_economicos: {
@@ -39,6 +55,12 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     inflacao: -0.4,
     crescimento_pib: 0.5,
     despesas_governo: -0.4,
+    poder_compra: 0.2,
+    produtividade: 0.3,
+    eficiencia_energetica: 0.2,
+    acesso_energia: 0.2,
+    capacidade_geracao: 0.2,
+    emissoes_energia: -0.25,
   },
   // Trabalhistas e social-democratas: salário mínimo, emprego, serviços públicos, previdência
   trabalhistas: {
@@ -51,6 +73,11 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     qualidade_educacao: 0.3,
     desigualdade_renda: -0.4,
     iva: -0.3, // IVA encarece cesta básica e consumo da classe trabalhadora
+    aprendizado_escolar: 0.25,
+    formacao_tecnica: 0.3,
+    conclusao_escolar: 0.25,
+    inclusao_social: 0.3,
+    evasao_escolar: -0.25,
   },
   // Jovens: emprego, educação, moradia, salário mínimo, cultura, custo de vida
   jovens: {
@@ -63,6 +90,13 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     investimento_habitacao: 0.3,
     participacao_renovaveis: 0.3,
     iva: -0.3, // Encarece eletrônicos, lazer, vestuário
+    inclusao_digital_educacao: 0.3,
+    aprendizado_escolar: 0.25,
+    acesso_habitacao: 0.3,
+    economia_criativa: 0.25,
+    empregos_culturais: 0.2,
+    diversidade_cultural: 0.25,
+    evasao_escolar: -0.35,
   },
   // Idosos: saúde, medicamentos, aposentadoria, inflação, serviços essenciais
   idosos: {
@@ -73,6 +107,11 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     tempo_espera_saude: -0.4,
     salarios_saude: 0.2,
     iva: -0.3, // Encarece remédios e alimentos
+    cobertura_atencao_basica: 0.4,
+    disponibilidade_medicamentos: 0.5,
+    vacinacao: 0.3,
+    satisfacao_sus: 0.4,
+    acesso_energia: 0.25,
   },
   // Religiosos: costumes, família, assistência social, combate à pobreza, segurança
   religiosos: {
@@ -82,6 +121,10 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     criminalidade: -0.3,
     qualidade_vida: 0.3,
     homicidios: -0.2,
+    confianca_seguranca: 0.3,
+    seguranca_alimentar: 0.3,
+    inclusao_social: 0.25,
+    participacao_cultural: 0.2,
   },
   // População de baixa renda: Bolsa Família, salário mínimo, inflação, alimentos, consumo essencial
   baixa_renda: {
@@ -93,6 +136,14 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     acesso_saude: 0.4,
     orcamento_saude: 0.3,
     iva: -0.6, // Imposto sobre consumo pesa proporcionalmente muito mais no pobre
+    poder_compra: 0.5,
+    seguranca_alimentar: 0.45,
+    acesso_habitacao: 0.35,
+    inclusao_social: 0.4,
+    disponibilidade_medicamentos: 0.25,
+    empregos_culturais: 0.2,
+    aprendizado_escolar: 0.35,
+    evasao_escolar: -0.35,
   },
   // Classe média: IR, IVA, inflação, desemprego, segurança, saúde, educação
   classe_media: {
@@ -105,6 +156,11 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     qualidade_saude: 0.3,
     qualidade_educacao: 0.3,
     custo_energia: -0.3,
+    poder_compra: 0.3,
+    acesso_energia: 0.25,
+    eficiencia_energetica: 0.2,
+    confianca_seguranca: 0.25,
+    acesso_habitacao: 0.2,
   },
   // Empresários: impostos, juros, crescimento, inflação, consumo, custo de produção
   empresarios: {
@@ -115,6 +171,12 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     inflacao: -0.4,
     investimento_publico: 0.4,
     salario_minimo: -0.3, // Aumento abrupto eleva custo de folha
+    poder_compra: 0.3,
+    eficiencia_energetica: 0.25,
+    capacidade_geracao: 0.2,
+    emissoes_energia: -0.2,
+    economia_criativa: 0.4,
+    empregos_culturais: 0.3,
   },
   // Agronegócio: crédito, exportação, juros, estradas/investimento, energia, diesel
   agronegocio: {
@@ -124,6 +186,9 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     custo_energia: -0.3,
     iva: -0.3, // Insumos e maquinários agrícolas
     imposto_empresas: -0.4,
+    capacidade_geracao: 0.2,
+    acesso_energia: 0.2,
+    emissoes_energia: -0.2,
   },
   // Servidores públicos: salários, contratação, orçamento dos ministérios
   servidores_publicos: {
@@ -134,5 +199,14 @@ export const GROUP_SENSITIVITY: GroupSensitivityMap = {
     orcamento_seguranca: 0.3,
     despesas_governo: 0.4,
     orcamento_assistencia_social: 0.3,
+    resolucao_crimes: 0.3,
+    confianca_seguranca: 0.25,
+    condicoes_prisionais: 0.25,
+    reincidencia_prisional: -0.2,
+    satisfacao_sus: 0.2,
+    qualificacao_docente: 0.25,
+    diversidade_cultural: 0.2,
+    preservacao_acervos: 0.2,
+    capacidade_geracao: 0.2,
   },
 };

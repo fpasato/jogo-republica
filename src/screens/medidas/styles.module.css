@@ -1,0 +1,378 @@
+/* ============================================================
+   Medidas — Paleta "Neon Grid" (dark #000)
+   Layout editorial: 3 seções, cards compactos + listas
+   ============================================================ */
+
+.page {
+  --bg-void: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-elevated: #141414;
+  --border: #262626;
+  --border-strong: #3a3a3a;
+  --text: #f5f5f5;
+  --text-muted: #8a8a8a;
+  --text-dim: #5a5a5a;
+
+  --green-500: #22c55e;
+  --green-400: #4ade80;
+  --yellow-500: #facc15;
+  --yellow-400: #fde047;
+  --blue-500: #3b82f6;
+  --blue-400: #60a5fa;
+  --red-500: #ef4444;
+  --red-400: #f87171;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--bg-void);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ═══════════════════════════════════════════════════
+   SEÇÕES
+   ═══════════════════════════════════════════════════ */
+
+.section {
+  padding: 36px 40px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.sectionTitle {
+  margin: 0 0 24px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.empty {
+  margin: 0;
+  padding: 48px 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  font-style: italic;
+}
+
+/* ═══════════════════════════════════════════════════
+   GRID DE POLÍTICAS ATIVAS
+   ═══════════════════════════════════════════════════ */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+/* ═══════════════════════════════════════════════════
+   CARD DE POLÍTICA ATIVA
+   ═══════════════════════════════════════════════════ */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  transition: border-color 140ms ease, background 140ms ease;
+  min-width: 0;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* Badge de tipo de política */
+
+.badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badge[data-type="imposto"] {
+  color: var(--yellow-400);
+}
+
+.badge[data-type="beneficio"] {
+  color: var(--green-400);
+}
+
+.badge[data-type="programa"] {
+  color: var(--blue-400);
+}
+
+.badge[data-type="regulacao"] {
+  color: var(--text-muted);
+}
+
+.badge[data-type="permanent"] {
+  color: var(--green-400);
+}
+
+.badge[data-type="temporary"] {
+  color: var(--yellow-400);
+}
+
+/* Corpo do card */
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.label {
+  color: var(--text-muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.value {
+  color: var(--text);
+  font-weight: 600;
+  font-feature-settings: "tnum" 1;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ═══════════════════════════════════════════════════
+   LISTA DE HISTÓRICO
+   ═══════════════════════════════════════════════════ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+}
+
+.listItem {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background 140ms ease;
+  min-width: 0;
+}
+
+.listItem:last-child {
+  border-bottom: none;
+}
+
+.listItem:hover {
+  background: var(--bg-elevated);
+}
+
+.listItemHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.listItemName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Status da medida */
+
+.status {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.status[data-status="active"],
+.status[data-status="approved"] {
+  color: var(--green-400);
+}
+
+.status[data-status="rejected"] {
+  color: var(--red-400);
+}
+
+.status[data-status="archived"] {
+  color: var(--text-muted);
+}
+
+.status[data-status="expired"] {
+  color: var(--yellow-400);
+}
+
+/* Detalhes (linha de metadados) */
+
+.listItemDetails {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0.02em;
+}
+
+.detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail + .detail::before {
+  content: "·";
+  color: var(--border-strong);
+}
+
+/* Texto original da proposta */
+
+.historyText {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+
+  /* Limita a 2 linhas pra não estourar */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVO
+   ═══════════════════════════════════════════════════ */
+
+@media (max-width: 1000px) {
+  .section {
+    padding: 28px 24px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  .card {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 760px) {
+  .section {
+    padding: 24px 16px;
+  }
+
+  .sectionTitle {
+    font-size: 12px;
+    margin-bottom: 18px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .card {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .cardTitle {
+    font-size: 13px;
+  }
+
+  .listItem {
+    padding: 14px 16px;
+  }
+
+  .listItemName {
+    font-size: 12px;
+  }
+
+  .listItemDetails {
+    font-size: 9px;
+    gap: 12px;
+  }
+
+  .info {
+    font-size: 10px;
+  }
+
+  .historyText {
+    font-size: 10px;
+    -webkit-line-clamp: 3;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   ACESSIBILIDADE
+   ═══════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .listItem {
+    transition: none;
+  }
+}

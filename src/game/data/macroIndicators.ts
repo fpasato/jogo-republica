@@ -31,7 +31,7 @@ export function initialMacroValues(): Record<string, number> {
   const out: Record<string, number> = {};
   for (const m of MACRO_INDICATORS) {
     const ind = getIndicator(m.id);
-    out[m.id] = ind.initial ?? m.initial;
+    out[m.id] = ind.initial;
   }
   return out;
 }

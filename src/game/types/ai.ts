@@ -5,6 +5,7 @@ import type { IndicatorDirection } from '../data/indicators';
 import type { ActivePolicy } from './policy';
 
 export type FiscalType = 'neutro' | 'custo' | 'economia';
+export type MeasureKind = 'imposto' | 'beneficio' | 'programa' | 'medida';
 export type LegalRisk = 'baixo' | 'medio' | 'alto';
 export type FiscalMagnitude = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -16,6 +17,8 @@ export interface ImpactoFiscal {
 }
 
 export interface AIInterpretation {
+  titulo?: string;
+  tipo_medida?: MeasureKind;
   interpretacao: string;
   instrumento: InstrumentId;
   motivo_instrumento: string;
@@ -28,6 +31,7 @@ export interface AIInterpretation {
   posicao_ideologica: number;
   grupos: Record<string, number>;
   indicadores: Record<string, number>;
+  novosIndicadores?: NewPolicyIndicator[];
   risco_juridico: LegalRisk;
   assessoria_juridica: string;
   area_principal?: string;
@@ -40,6 +44,25 @@ export interface AIInterpretation {
   _quality?: number;
   _fallback?: boolean;
   warnings?: string[];
+}
+
+export interface NewPolicyIndicator {
+  id: string;
+  nome: string;
+  curto: string;
+  categoria: 'economia' | 'saude' | 'educacao' | 'social' | 'seguranca' | 'energia' | 'cultura';
+  tipo: 'slider' | 'informativo';
+  unidade: string;
+  valorInicial: number;
+  valorProposto?: number;
+  minimo?: number;
+  maximo?: number;
+  passo?: number;
+  delta?: number;
+  fiscalAnnual?: number;
+  affects?: Record<string, number>;
+  affectScale?: number;
+  descricao: string;
 }
 
 export interface QueryRequest {
@@ -111,6 +134,7 @@ export interface ActivePolicyContext {
   monthsToFullEffect: number;
   monthsToExpire?: number;
   affectedIndicators: string[];
+  newIndicators?: NewPolicyIndicator[];
   affectedGroups: Array<{ id: string; delta: number }>;
   fiscalAnnual: number;
 }
@@ -285,6 +309,7 @@ export interface GameStateForNews {
     activeMonths: number;
     fiscalAnnual: number;
     effects: Record<string, number | undefined>;
+    newIndicators?: NewPolicyIndicator[];
   }>;
   stateApprovals?: Record<string, number>;
   activeReactions?: Array<{ groupId: string; monthsActive: number }>;

@@ -13,7 +13,7 @@ export const clampApproval = (n: number) =>
   Math.min(APPROVAL_MAX, Math.max(APPROVAL_MIN, Number.isFinite(n) ? n : NEUTRAL));
 
 const BASELINE_DRIFT_RATE = 0.02;
-const SENSITIVITY_RATE = 0.85; // Resposta vigorosa às alterações do jogador
+const SENSITIVITY_RATE = 1.15;
 const POLICY_MARK_RATE = 0.35;
 
 export function computeGroupBaseline(
@@ -59,7 +59,7 @@ export function countIdleMonths(
 }
 
 export function idleDrift(idleMonths: number): number {
-  return idleMonths <= 0 ? 0 : -Math.min(2.0, 0.5 * idleMonths);
+  return idleMonths <= 0 ? 0 : -Math.min(0.4, 0.08 * idleMonths);
 }
 
 export interface IndicatorDeltas {
@@ -98,7 +98,8 @@ export function indicatorSensitivityDelta(
       effectiveDelta *= 1.4; // Penalidade por choque tributário abrupto
     }
 
-    const contribution = effectiveDelta * weight * combat * SENSITIVITY_RATE;
+    const rawContribution = effectiveDelta * weight * combat * SENSITIVITY_RATE;
+    const contribution = rawContribution >= 0 ? rawContribution * 1.5 : rawContribution * 0.45;
     total += contribution;
     breakdown.push({ indicatorId, delta: indDelta, weight });
   }
@@ -145,15 +146,21 @@ export function runApprovalTurn(input: ApprovalTurnInput): ApprovalTurnResult {
     const baselineDrift = groupDriftTowards(before, baseline);
     const { delta: sensitivity, breakdown } = indicatorSensitivityDelta(g.id, input.indicatorDeltas);
     const idle = input.idleDriftAmount ?? 0;
+    const newPolicyImpact = input.activePolicies
+      .filter((policy) => (policy.activeMonths ?? 0) === 0)
+      .reduce((sum, policy) => {
+        const reaction = policy.groupReactions[g.id] ?? 0;
+        return sum + reaction * (reaction >= 0 ? 0.5 : 0.25);
+      }, 0);
 
-    const after = clampApproval(before + baselineDrift + sensitivity + idle);
+    const after = clampApproval(before + baselineDrift + sensitivity + idle + newPolicyImpact);
     approvals[g.id] = after;
 
     log.push({
       groupId: g.id,
       before,
       after,
-      parts: { baselineDrift, sensitivity, idle },
+      parts: { baselineDrift, sensitivity: sensitivity + newPolicyImpact, idle },
       breakdown,
     });
   }

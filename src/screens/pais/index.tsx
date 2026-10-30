@@ -1,10 +1,10 @@
 // src/screens/pais/index.tsx
 
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Header } from '../../components/header';
 import { Footer } from '../../components/footer';
 import { useGameStore } from '../../store/gameStore';
-import { INDICATORS, type IndicatorDef } from '../../game/data/indicators';
+import { INDICATORS, type IndicatorDef, type IndicatorCategory } from '../../game/data/indicators';
 import { GROUPS } from '../../game/data/groups';
 import {
   AREA_TITULO,
@@ -16,36 +16,94 @@ import {
 import styles from './styles.module.css';
 
 type Game = NonNullable<ReturnType<typeof useGameStore.getState>['game']>;
-type GroupDef = (typeof GROUPS)[number];
+type StatusFilter = 'todos' | 'alta' | 'baixa' | 'estavel';
 
 /* ═══════════════════════════════════════════════════════════════
-   LINE CHART — SVG puro, sem dependência
+   PALETA — rank de aprovação
+   ═══════════════════════════════════════════════════════════════ */
+
+const GROUP_COLORS = [
+  '#22c55e', '#4ade80', '#86efac', '#16a34a',
+  '#facc15', '#fde047', '#fef08a', '#eab308',
+  '#3b82f6', '#60a5fa', '#93c5fd', '#2563eb',
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   SPARKLINE — mini gráfico no card
+   ═══════════════════════════════════════════════════════════════ */
+
+interface SparklineProps {
+  values: (number | undefined | null)[];
+  stroke: string;
+  width?: number;
+  height?: number;
+}
+
+function Sparkline({ values, stroke, width = 120, height = 28 }: SparklineProps) {
+  const numeric = values.filter(
+    (v): v is number => typeof v === 'number' && Number.isFinite(v),
+  );
+  if (numeric.length < 2) return null;
+
+  const lo = Math.min(...numeric);
+  const hi = Math.max(...numeric);
+  const span = hi - lo || 1;
+  const PAD = 2;
+
+  const xAt = (i: number) => (i / (values.length - 1)) * width;
+  const yAt = (v: number) =>
+    PAD + (height - PAD * 2) - ((v - lo) / span) * (height - PAD * 2);
+
+  const points = values
+    .map((v, i) =>
+      typeof v === 'number' && Number.isFinite(v)
+        ? `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`
+        : null,
+    )
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <svg
+      className={styles.sparkline}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <polyline
+        points={points}
+        fill="none"
+        stroke={stroke}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LINE CHART — detalhe
    ═══════════════════════════════════════════════════════════════ */
 
 interface LineChartProps {
   values: (number | undefined | null)[];
   width?: number;
   height?: number;
-  /** Cor da linha (default: verde) */
   stroke?: string;
-  /** Rótulo de cada ponto no tooltip */
   tooltip?: (value: number | undefined | null, index: number) => string;
-  /** Formata o rótulo do eixo Y */
   yFormatter?: (value: number) => string;
-  /** Escala fixa de Y (ex: 0..100 para aprovação). Se omitido, auto. */
   yMin?: number;
   yMax?: number;
-  /** Mostra a linha horizontal no zero */
   showZeroLine?: boolean;
-  /** Unidade do ponto atual */
   currentLabel?: string;
 }
 
 function LineChart({
   values,
   width = 720,
-  height = 260,
-  stroke = 'var(--green-500)',
+  height = 220,
+  stroke = 'var(--green-500, #22c55e)',
   tooltip,
   yFormatter = (v) => v.toFixed(1),
   yMin,
@@ -74,15 +132,12 @@ function LineChart({
   const hi = yMax !== undefined ? yMax : Math.max(dataMax, showZeroLine ? 0 : dataMax);
   const span = hi - lo || 1;
 
-  // escala
   const xAt = (i: number) =>
     values.length === 1
       ? PAD.left + innerW / 2
       : PAD.left + (i / (values.length - 1)) * innerW;
-  const yAt = (v: number) =>
-    PAD.top + innerH - ((v - lo) / span) * innerH;
+  const yAt = (v: number) => PAD.top + innerH - ((v - lo) / span) * innerH;
 
-  // pontos válidos
   const points = values
     .map((v, i) =>
       typeof v === 'number' && Number.isFinite(v)
@@ -91,12 +146,10 @@ function LineChart({
     )
     .filter((p): p is { x: number; y: number; v: number; i: number } => p !== null);
 
-  // caminho da linha
   const linePath = points
     .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
     .join(' ');
 
-  // área preenchida (gradiente)
   const areaPath =
     points.length > 0
       ? `${linePath} L ${points[points.length - 1].x.toFixed(2)} ${(
@@ -106,10 +159,7 @@ function LineChart({
         ).toFixed(2)} Z`
       : '';
 
-  // ticks do eixo Y (5 linhas)
   const yTicks = Array.from({ length: 5 }, (_, i) => lo + (span / 4) * i);
-
-  // ticks do eixo X (máx 8 labels pra não lotar)
   const xStep = Math.max(1, Math.ceil(values.length / 8));
   const xTicks = values
     .map((_, i) => i)
@@ -131,7 +181,6 @@ function LineChart({
         </linearGradient>
       </defs>
 
-      {/* grade horizontal */}
       {yTicks.map((t, i) => {
         const y = yAt(t);
         return (
@@ -150,7 +199,6 @@ function LineChart({
         );
       })}
 
-      {/* linha do zero (opcional) */}
       {showZeroLine && lo < 0 && hi > 0 && (
         <line
           x1={PAD.left}
@@ -161,12 +209,8 @@ function LineChart({
         />
       )}
 
-      {/* área preenchida */}
-      {areaPath && (
-        <path d={areaPath} fill="url(#lc-fill)" />
-      )}
+      {areaPath && <path d={areaPath} fill="url(#lc-fill)" />}
 
-      {/* linha */}
       {linePath && (
         <path
           d={linePath}
@@ -179,15 +223,9 @@ function LineChart({
         />
       )}
 
-      {/* pontos */}
       {points.map((p) => (
         <g key={p.i} className={styles.chartPointGroup}>
-          <circle
-            cx={p.x}
-            cy={p.y}
-            r={8}
-            className={styles.chartPointHit}
-          >
+          <circle cx={p.x} cy={p.y} r={8} className={styles.chartPointHit}>
             <title>
               {tooltip ? tooltip(p.v, p.i) : `Mês ${p.i + 1}: ${yFormatter(p.v)}`}
             </title>
@@ -202,7 +240,6 @@ function LineChart({
         </g>
       ))}
 
-      {/* ponto atual (destaque) */}
       {last && (
         <>
           <circle
@@ -212,7 +249,13 @@ function LineChart({
             className={styles.chartPointPulse}
             style={{ stroke }}
           />
-          <circle cx={last.x} cy={last.y} r={4} className={styles.chartPointLast} style={{ fill: stroke }} />
+          <circle
+            cx={last.x}
+            cy={last.y}
+            r={4}
+            className={styles.chartPointLast}
+            style={{ fill: stroke }}
+          />
           {currentLabel && (
             <text
               x={last.x}
@@ -226,7 +269,6 @@ function LineChart({
         </>
       )}
 
-      {/* labels eixo X */}
       {xTicks.map((i) => (
         <text
           key={`x-${i}`}
@@ -243,40 +285,536 @@ function LineChart({
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   MULTI LINE CHART — grupos
+   ═══════════════════════════════════════════════════════════════ */
+
+interface Series {
+  id: string;
+  name: string;
+  color: string;
+  values: number[];
+  currentValue: number;
+  rank: number;
+}
+
+function MultiLineChart({
+  series,
+  hoveredId = null,
+  width = 900,
+  height = 220,
+  yMin = 0,
+  yMax = 100,
+  yFormatter = (v) => `${v.toFixed(0)}%`,
+}: {
+  series: Series[];
+  hoveredId?: string | null;
+  width?: number;
+  height?: number;
+  yMin?: number;
+  yMax?: number;
+  yFormatter?: (v: number) => string;
+}) {
+  const PAD = { top: 20, right: 24, bottom: 36, left: 52 };
+  const innerW = width - PAD.left - PAD.right;
+  const innerH = height - PAD.top - PAD.bottom;
+  const span = yMax - yMin || 1;
+  const maxLen = Math.max(...series.map((s) => s.values.length), 1);
+
+  const xAt = (i: number) =>
+    maxLen === 1
+      ? PAD.left + innerW / 2
+      : PAD.left + (i / (maxLen - 1)) * innerW;
+  const yAt = (v: number) => PAD.top + innerH - ((v - yMin) / span) * innerH;
+
+  const yTicks = Array.from({ length: 6 }, (_, i) => yMin + (span / 5) * i);
+  const xStep = Math.max(1, Math.ceil(maxLen / 10));
+  const xTicks = Array.from({ length: maxLen }, (_, i) => i).filter(
+    (i) => i === 0 || i === maxLen - 1 || i % xStep === 0,
+  );
+
+  const anyHovered = hoveredId !== null;
+  const isDimmed = (id: string) => anyHovered && hoveredId !== id;
+  const isHighlighted = (id: string) => anyHovered && hoveredId === id;
+
+  return (
+    <svg
+      className={styles.multiChart}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Evolução da aprovação por grupo social"
+    >
+      {yTicks.map((t, i) => (
+        <g key={`y-${i}`}>
+          <line
+            x1={PAD.left}
+            x2={PAD.left + innerW}
+            y1={yAt(t)}
+            y2={yAt(t)}
+            className={styles.chartGrid}
+          />
+          <text
+            x={PAD.left - 10}
+            y={yAt(t) + 3}
+            className={styles.chartYLabel}
+          >
+            {yFormatter(t)}
+          </text>
+        </g>
+      ))}
+
+      {xTicks.map((i) => (
+        <text
+          key={`x-${i}`}
+          x={xAt(i)}
+          y={PAD.top + innerH + 20}
+          textAnchor="middle"
+          className={styles.chartXLabel}
+        >
+          M{i + 1}
+        </text>
+      ))}
+
+      {series.map((s) => {
+        const points = s.values
+          .map((v, i) =>
+            typeof v === 'number' && Number.isFinite(v)
+              ? { x: xAt(i), y: yAt(v), v, i }
+              : null,
+          )
+          .filter(
+            (p): p is { x: number; y: number; v: number; i: number } => p !== null,
+          );
+
+        if (points.length === 0) return null;
+
+        const path = points
+          .map(
+            (p, idx) =>
+              `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`,
+          )
+          .join(' ');
+
+        const last = points[points.length - 1];
+        const dimmed = isDimmed(s.id);
+        const highlighted = isHighlighted(s.id);
+
+        return (
+          <g
+            key={s.id}
+            className={styles.multiLineGroup}
+            data-dimmed={dimmed ? 'true' : undefined}
+            data-highlighted={highlighted ? 'true' : undefined}
+            style={{ '--line-color': s.color } as React.CSSProperties}
+          >
+            <path
+              d={path}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={highlighted ? 2.5 : 1.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              className={styles.multiLinePath}
+            >
+              <title>{s.name}</title>
+            </path>
+
+            <circle
+              cx={last.x}
+              cy={last.y}
+              r={highlighted ? 4.5 : 3}
+              fill={s.color}
+              stroke={highlighted ? '#ffffff' : 'transparent'}
+              strokeWidth={1.5}
+              className={styles.multiLinePoint}
+            >
+              <title>
+                {`${s.name} · Mês ${last.i + 1}: ${last.v.toFixed(1)}%`}
+              </title>
+            </circle>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INDICATOR CARD — compacto, memoizado
+   ═══════════════════════════════════════════════════════════════ */
+
+interface IndicatorCardProps {
+  metric: IndicatorDef;
+  value: number | undefined;
+  prevValue: number | undefined;
+  history: (number | undefined)[];
+  onClick: (metric: IndicatorDef) => void;
+}
+
+const IndicatorCard = memo(function IndicatorCard({
+  metric,
+  value,
+  prevValue,
+  history,
+  onClick,
+}: IndicatorCardProps) {
+  const delta =
+    value !== undefined && prevValue !== undefined ? value - prevValue : null;
+  const tom = tomDaVariacao(metric, delta);
+  const formatted = formatarValorIndicador(metric, value);
+
+  const isBudget = metric.id === 'saldo_orcamentario';
+  const sparkColor =
+    tom === 'good'
+      ? 'var(--green-400, #4ade80)'
+      : tom === 'bad'
+        ? 'var(--red-400, #f87171)'
+        : isBudget
+          ? 'var(--yellow-400, #fde047)'
+          : 'var(--blue-400, #60a5fa)';
+
+  return (
+    <button
+      type="button"
+      className={styles.indicatorCard}
+      onClick={() => onClick(metric)}
+      data-tone={tom}
+    >
+      <span className={styles.indicatorCardValue}>{formatted}</span>
+      <span className={styles.indicatorCardName}>{metric.nome}</span>
+      <span className={styles.indicatorCardDelta} data-direction={tom}>
+        {delta === null ? 'Base inicial' : formatarDeltaIndicador(metric, delta)}
+      </span>
+      <Sparkline values={history} stroke={sparkColor} />
+    </button>
+  );
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   INDICATOR DRAWER — painel lateral com detalhes
+   ═══════════════════════════════════════════════════════════════ */
+
+const HISTORY_LIMIT = 12;
+
+function IndicatorDrawer({
+  metric,
+  game,
+  onClose,
+}: {
+  metric: IndicatorDef;
+  game: Game;
+  onClose: () => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+
+  const current = game.nationalIndicators[metric.id];
+  const historyValues = game.history.map((h) => h.national?.[metric.id]);
+  const fullHistory: (number | undefined)[] = [...historyValues, current];
+
+  const prevValue = game.history.at(-1)?.national?.[metric.id];
+  const delta =
+    current !== undefined && prevValue !== undefined ? current - prevValue : null;
+  const tom = tomDaVariacao(metric, delta);
+
+  const isBudget = metric.id === 'saldo_orcamentario';
+
+  const rows = fullHistory.map((val, i) => ({ val, i }));
+  const visibleRows = showAll ? rows : rows.slice(-HISTORY_LIMIT);
+  const hiddenCount = rows.length - visibleRows.length;
+
+  return (
+    <>
+      <div className={styles.drawerBackdrop} onClick={onClose} />
+      <aside
+        className={styles.drawer}
+        role="dialog"
+        aria-label={`Detalhes de ${metric.nome}`}
+      >
+        <header className={styles.drawerHeader}>
+          <div className={styles.drawerHeaderMain}>
+            <span className={styles.drawerCategory}>
+              {AREA_TITULO[metric.category] ?? metric.category}
+            </span>
+            <h2 className={styles.drawerTitle}>{metric.nome}</h2>
+          </div>
+          <button
+            type="button"
+            className={styles.drawerClose}
+            onClick={onClose}
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </header>
+
+        <div className={styles.drawerBody}>
+          <div className={styles.drawerValueBlock}>
+            <span className={styles.drawerValue}>
+              {formatarValorIndicador(metric, current)}
+            </span>
+            {delta !== null && (
+              <span className={styles.drawerDelta} data-direction={tom}>
+                {formatarDeltaIndicador(metric, delta)} vs. mês anterior
+              </span>
+            )}
+          </div>
+
+          <p className={styles.drawerDesc}>{metric.descricao}</p>
+
+          <div className={styles.drawerSection}>
+            <h3 className={styles.drawerSectionTitle}>Histórico</h3>
+            <div className={styles.chartWrap}>
+              <LineChart
+                values={fullHistory}
+                stroke={
+                  isBudget
+                    ? 'var(--yellow-500, #facc15)'
+                    : 'var(--green-500, #22c55e)'
+                }
+                tooltip={(v) =>
+                  v !== undefined && v !== null
+                    ? formatarValorIndicador(metric, v)
+                    : 'Sem dado'
+                }
+                yFormatter={(v) =>
+                  Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(1)
+                }
+                showZeroLine={isBudget}
+                currentLabel={
+                  current !== undefined
+                    ? formatarValorIndicador(metric, current)
+                    : undefined
+                }
+              />
+            </div>
+          </div>
+
+          <div className={styles.drawerSection}>
+            <h3 className={styles.drawerSectionTitle}>
+              Tabela de histórico
+              {!showAll && hiddenCount > 0 && (
+                <span className={styles.drawerSectionHint}>
+                  últimos {HISTORY_LIMIT} de {rows.length}
+                </span>
+              )}
+            </h3>
+            <table className={styles.historyTable}>
+              <thead>
+                <tr>
+                  <th>Mês</th>
+                  <th>Valor</th>
+                  <th>Variação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map(({ val, i }) => {
+                  const prev = i > 0 ? fullHistory[i - 1] : null;
+                  const diff =
+                    val !== undefined &&
+                    val !== null &&
+                    prev !== undefined &&
+                    prev !== null
+                      ? val - prev
+                      : null;
+                  const diffTom =
+                    diff !== null ? tomDaVariacao(metric, diff) : 'neutral';
+
+                  return (
+                    <tr key={i}>
+                      <td className={styles.tableMonth}>Mês {i + 1}</td>
+                      <td className={styles.tableValue}>
+                        {val !== undefined && val !== null
+                          ? formatarValorIndicador(metric, val)
+                          : '—'}
+                      </td>
+                      <td>
+                        {diff !== null ? (
+                          <span
+                            className={styles.tableDelta}
+                            data-direction={diffTom}
+                          >
+                            {formatarDeltaIndicador(metric, diff)}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {!showAll && hiddenCount > 0 && (
+              <button
+                type="button"
+                className={styles.showMoreBtn}
+                onClick={() => setShowAll(true)}
+              >
+                Ver todos os {rows.length} meses
+              </button>
+            )}
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GROUPS VIEW
+   ═══════════════════════════════════════════════════════════════ */
+
+function GroupsView({ game }: { game: Game }) {
+  const [hovered, setHovered] = useState<string | null>(null);
+
+  const rawSeries = GROUPS.map((g) => {
+    const approval = game.groupApprovals[g.id] ?? g.initialApproval ?? 50;
+    const history = game.history.map(
+      (h) => h.groupApprovals?.[g.id] ?? approval,
+    );
+    return {
+      id: g.id,
+      name: g.nome,
+      values: [...history, approval],
+      currentValue: approval,
+    };
+  });
+
+  const sorted = [...rawSeries].sort((a, b) => b.currentValue - a.currentValue);
+
+  const series: Series[] = sorted.map((s, idx) => ({
+    ...s,
+    rank: idx + 1,
+    color: GROUP_COLORS[idx % GROUP_COLORS.length],
+  }));
+
+  return (
+    <div className={styles.groupsView}>
+      <header className={styles.groupsHeader}>
+        <div>
+          <h2 className={styles.groupsTitle}>Evolução por Grupo</h2>
+          <p className={styles.groupsSubtitle}>
+            Ordenado do mais aprovado ao menos aprovado.
+          </p>
+        </div>
+        <span className={styles.groupsCount}>{GROUPS.length} grupos</span>
+      </header>
+
+      <div className={styles.groupsBody}>
+        <aside className={styles.groupsLegend} aria-label="Legenda">
+          {series.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={styles.legendItem}
+              data-hovered={hovered === s.id}
+              data-top={s.rank <= 4 ? 'true' : undefined}
+              onMouseEnter={() => setHovered(s.id)}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={() => setHovered(s.id)}
+              onBlur={() => setHovered(null)}
+            >
+              <span className={styles.legendRank}>{s.rank}</span>
+              <span
+                className={styles.legendSwatch}
+                style={{ background: s.color }}
+              />
+              <span className={styles.legendName}>{s.name}</span>
+              <span className={styles.legendValue} style={{ color: s.color }}>
+                {s.currentValue.toFixed(1)}%
+              </span>
+            </button>
+          ))}
+        </aside>
+
+        <div className={styles.multiChartWrap}>
+          <MultiLineChart series={series} hoveredId={hovered} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    PÁGINA
    ═══════════════════════════════════════════════════════════════ */
 
 export function Pais() {
   const game = useGameStore((state) => state.game);
   const [activeTab, setActiveTab] = useState<string>('overview');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
+  const [selectedMetricId, setSelectedMetricId] = useState<string | null>(null);
+
+  const selectedMetric =
+    selectedMetricId !== null
+      ? INDICATORS.find((m) => m.id === selectedMetricId) ?? null
+      : null;
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const base =
+      activeTab === 'overview'
+        ? INDICATORS
+        : INDICATORS.filter((m) => m.category === activeTab);
+
+    return base.filter((m) => {
+      if (q && !m.nome.toLowerCase().includes(q)) return false;
+
+      if (statusFilter === 'todos') return true;
+      const value = game?.nationalIndicators[m.id];
+      const prev = game?.history.at(-1)?.national?.[m.id];
+      if (value === undefined || prev === undefined) return false;
+      const delta = value - prev;
+      if (Math.abs(delta) < 0.001) return statusFilter === 'estavel';
+      const tom = tomDaVariacao(m, delta);
+      if (statusFilter === 'alta') return tom === 'good';
+      if (statusFilter === 'baixa') return tom === 'bad';
+      return false;
+    });
+  }, [activeTab, query, statusFilter, game]);
+
+  const grouped = useMemo(() => {
+    if (activeTab !== 'overview') return null;
+    const map = new Map<IndicatorCategory, IndicatorDef[]>();
+    for (const m of filtered) {
+      const list = map.get(m.category) ?? [];
+      list.push(m);
+      map.set(m.category, list);
+    }
+    return map;
+  }, [filtered, activeTab]);
 
   if (!game) return null;
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    setSelectedId(null);
+    setSelectedMetricId(null);
+    setQuery('');
+    setStatusFilter('todos');
   };
 
-  const listItems =
-    activeTab === 'grupos'
-      ? GROUPS.map((g) => ({ type: 'group' as const, item: g }))
-      : activeTab === 'overview'
-        ? INDICATORS.map((m) => ({ type: 'indicator' as const, item: m }))
-        : INDICATORS.filter((m) => m.category === activeTab).map((m) => ({
-            type: 'indicator' as const,
-            item: m,
-          }));
+  const handleCardClick = (metric: IndicatorDef) => {
+    setSelectedMetricId(metric.id);
+  };
 
-  const selectedGroup =
-    activeTab === 'grupos' && selectedId
-      ? GROUPS.find((g) => g.id === selectedId) ?? null
-      : null;
+  const historyFor = (metricId: string): (number | undefined)[] => {
+    const historic = game.history.map((h) => h.national?.[metricId]);
+    return [...historic, game.nationalIndicators[metricId]];
+  };
 
-  const selectedIndicator =
-    activeTab !== 'grupos' && selectedId
-      ? INDICATORS.find((m) => m.id === selectedId) ?? null
-      : null;
+  const renderCard = (metric: IndicatorDef) => (
+    <IndicatorCard
+      key={metric.id}
+      metric={metric}
+      value={game.nationalIndicators[metric.id]}
+      prevValue={game.history.at(-1)?.national?.[metric.id]}
+      history={historyFor(metric.id)}
+      onClick={handleCardClick}
+    />
+  );
+
+  const isGroupsTab = activeTab === 'grupos';
+  const showToolbar = !isGroupsTab;
 
   return (
     <div className={styles.container}>
@@ -288,7 +826,7 @@ export function Pais() {
             className={`${styles.tabBtn} ${activeTab === 'overview' ? styles.activeTab : ''}`}
             onClick={() => handleTabChange('overview')}
           >
-            Visão Geral
+            Todos
           </button>
           {AREAS_NO_PAINEL.map((area) => (
             <button
@@ -309,303 +847,106 @@ export function Pais() {
           </button>
         </nav>
 
-        <div className={styles.split}>
-          <aside className={styles.listPane} aria-label="Atributos">
-            {listItems.map((entry) => {
-              if (entry.type === 'group') {
-                const g = entry.item;
-                const approval = game.groupApprovals[g.id] ?? g.initialApproval ?? 50;
-                return (
-                  <button
-                    key={g.id}
-                    type="button"
-                    className={styles.listItem}
-                    data-selected={selectedId === g.id}
-                    onClick={() => setSelectedId(g.id)}
-                  >
-                    <div className={styles.listItemHeader}>
-                      <span className={styles.listItemName}>{g.nome}</span>
-                      <span className={styles.listItemValue}>
-                        {approval.toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className={styles.listItemMeta}>
-                      <span className={styles.listItemBadge} data-cat={g.categoria}>
-                        {g.categoria}
-                      </span>
-                      <span className={styles.listItemSub}>Influência: {g.peso}</span>
-                    </div>
-                  </button>
-                );
-              }
-
-              const m = entry.item;
-              const value = game.nationalIndicators[m.id];
-              const prevValue = game.history.at(-1)?.national?.[m.id];
-              const delta =
-                value !== undefined && prevValue !== undefined
-                  ? value - prevValue
-                  : null;
-              const tom = tomDaVariacao(m, delta);
-
-              return (
+        {showToolbar && (
+          <div className={styles.toolbar}>
+            <div className={styles.searchBox}>
+              <span className={styles.searchIcon} aria-hidden="true">
+                ⌕
+              </span>
+              <input
+                type="search"
+                className={styles.searchInput}
+                placeholder={`Buscar entre ${INDICATORS.length} atributos...`}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              {query && (
                 <button
-                  key={m.id}
                   type="button"
-                  className={styles.listItem}
-                  data-selected={selectedId === m.id}
-                  onClick={() => setSelectedId(m.id)}
+                  className={styles.searchClear}
+                  onClick={() => setQuery('')}
+                  aria-label="Limpar busca"
                 >
-                  <div className={styles.listItemHeader}>
-                    <span className={styles.listItemName}>{m.nome}</span>
-                    <span className={styles.listItemValue}>
-                      {formatarValorIndicador(m, value)}
-                    </span>
-                  </div>
-                  <div className={styles.listItemMeta}>
-                    <span className={styles.listItemSub}>
-                      {AREA_TITULO[m.category] ?? m.category}
-                    </span>
-                    {delta !== null && (
-                      <span className={styles.listItemDelta} data-direction={tom}>
-                        {formatarDeltaIndicador(m, delta)}
-                      </span>
-                    )}
-                  </div>
+                  ✕
                 </button>
-              );
-            })}
-          </aside>
+              )}
+            </div>
+            <div className={styles.filterPills} role="tablist" aria-label="Filtro por status">
+              {(
+                [
+                  ['todos', 'Todos'],
+                  ['alta', 'Em alta'],
+                  ['baixa', 'Em baixa'],
+                  ['estavel', 'Estáveis'],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={styles.filterPill}
+                  data-active={statusFilter === key}
+                  onClick={() => setStatusFilter(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className={styles.resultCount}>
+              {filtered.length} {filtered.length === 1 ? 'resultado' : 'resultados'}
+            </span>
+          </div>
+        )}
 
-          <section className={styles.detailPane} aria-live="polite">
-            {selectedGroup ? (
-              <GroupDetail group={selectedGroup} game={game} />
-            ) : selectedIndicator ? (
-              <IndicatorDetail metric={selectedIndicator} game={game} />
-            ) : (
-              <div className={styles.emptyDetail}>
-                <span className={styles.emptyDetailIcon} aria-hidden>
-                  ◂
-                </span>
-                <p>Selecione um atributo à esquerda para ver o histórico.</p>
-              </div>
-            )}
-          </section>
+        <div className={styles.panelContent}>
+          {isGroupsTab ? (
+            <GroupsView game={game} />
+          ) : filtered.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p>Nenhum atributo corresponde ao filtro.</p>
+              <button
+                type="button"
+                className={styles.emptyReset}
+                onClick={() => {
+                  setQuery('');
+                  setStatusFilter('todos');
+                }}
+              >
+                Limpar filtros
+              </button>
+            </div>
+          ) : grouped ? (
+            Array.from(grouped.entries()).map(([cat, items]) => (
+              <section key={cat} className={styles.groupSection}>
+                <header className={styles.groupSectionHeader}>
+                  <h2 className={styles.groupSectionTitle}>
+                    {AREA_TITULO[cat] ?? cat}
+                  </h2>
+                  <span className={styles.groupSectionCount}>
+                    {items.length}
+                  </span>
+                </header>
+                <div className={styles.cardsGrid}>
+                  {items.map(renderCard)}
+                </div>
+              </section>
+            ))
+          ) : (
+            <div className={styles.cardsGrid}>
+              {filtered.map(renderCard)}
+            </div>
+          )}
         </div>
       </section>
+
+      {selectedMetric && (
+        <IndicatorDrawer
+          metric={selectedMetric}
+          game={game}
+          onClose={() => setSelectedMetricId(null)}
+        />
+      )}
+
       <Footer />
     </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   DETAIL — Indicador
-   ═══════════════════════════════════════════════════════════════ */
-
-function IndicatorDetail({ metric, game }: { metric: IndicatorDef; game: Game }) {
-  const current = game.nationalIndicators[metric.id];
-  const historyValues = game.history.map((h) => h.national?.[metric.id]);
-  const fullHistory: (number | undefined)[] = [...historyValues, current];
-
-  const prevValue = game.history.at(-1)?.national?.[metric.id];
-  const delta =
-    current !== undefined && prevValue !== undefined ? current - prevValue : null;
-  const tom = tomDaVariacao(metric, delta);
-
-  const isBudget = metric.id === 'saldo_orcamentario';
-
-  return (
-    <>
-      <header className={styles.detailHeader}>
-        <div className={styles.detailHeaderMain}>
-          <h3 className={styles.detailTitle}>{metric.nome}</h3>
-          <p className={styles.detailDesc}>{metric.descricao}</p>
-        </div>
-        <div className={styles.detailValueBox}>
-          <span className={styles.detailValueNumber}>
-            {formatarValorIndicador(metric, current)}
-          </span>
-          {delta !== null && (
-            <span className={styles.detailDelta} data-direction={tom}>
-              {formatarDeltaIndicador(metric, delta)} vs. mês anterior
-            </span>
-          )}
-        </div>
-      </header>
-
-      <div className={styles.section}>
-        <h4 className={styles.subheading}>Histórico</h4>
-        <div className={styles.chartWrap}>
-          <LineChart
-            values={fullHistory}
-            stroke={isBudget ? 'var(--yellow-500)' : 'var(--green-500)'}
-            tooltip={(v) =>
-              v !== undefined && v !== null
-                ? formatarValorIndicador(metric, v)
-                : 'Sem dado'
-            }
-            yFormatter={(v) =>
-              Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(1)
-            }
-            showZeroLine={isBudget}
-            currentLabel={
-              current !== undefined
-                ? formatarValorIndicador(metric, current)
-                : undefined
-            }
-          />
-        </div>
-      </div>
-
-      <div className={styles.section}>
-        <h4 className={styles.subheading}>Tabela de histórico</h4>
-        <table className={styles.historyTable}>
-          <thead>
-            <tr>
-              <th>Mês</th>
-              <th>Valor</th>
-              <th>Variação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fullHistory.map((val, i) => {
-              const prev = i > 0 ? fullHistory[i - 1] : null;
-              const diff =
-                val !== undefined &&
-                val !== null &&
-                prev !== undefined &&
-                prev !== null
-                  ? val - prev
-                  : null;
-              const diffTom =
-                diff !== null ? tomDaVariacao(metric, diff) : 'neutral';
-
-              return (
-                <tr key={i}>
-                  <td className={styles.tableMonth}>Mês {i + 1}</td>
-                  <td className={styles.tableValue}>
-                    {val !== undefined && val !== null
-                      ? formatarValorIndicador(metric, val)
-                      : '—'}
-                  </td>
-                  <td>
-                    {diff !== null ? (
-                      <span className={styles.tableDelta} data-direction={diffTom}>
-                        {formatarDeltaIndicador(metric, diff)}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   DETAIL — Grupo
-   ═══════════════════════════════════════════════════════════════ */
-
-function GroupDetail({ group, game }: { group: GroupDef; game: Game }) {
-  const approval = game.groupApprovals[group.id] ?? group.initialApproval ?? 50;
-  const historyValues = game.history.map(
-    (h) => h.groupApprovals?.[group.id] ?? approval,
-  );
-  const fullHistory: number[] = [...historyValues, approval];
-
-  const prev = fullHistory.length > 1 ? fullHistory[fullHistory.length - 2] : null;
-  const delta = prev !== null ? approval - prev : null;
-
-  return (
-    <>
-      <header className={styles.detailHeader}>
-        <div className={styles.detailHeaderMain}>
-          <h3 className={styles.detailTitle}>{group.nome}</h3>
-          <p className={styles.detailDesc}>{group.descricao}</p>
-          <div className={styles.detailBadgeRow}>
-            <span className={styles.listItemBadge} data-cat={group.categoria}>
-              {group.categoria}
-            </span>
-            <span className={styles.detailInfluence}>Influência: {group.peso}</span>
-          </div>
-        </div>
-        <div className={styles.detailValueBox}>
-          <span className={styles.detailValueNumber}>{approval.toFixed(1)}%</span>
-          {delta !== null && Math.abs(delta) >= 0.05 && (
-            <span
-              className={styles.detailDelta}
-              data-direction={delta > 0 ? 'good' : 'bad'}
-            >
-              {delta > 0 ? '+' : ''}
-              {delta.toFixed(1)} p.p.
-            </span>
-          )}
-        </div>
-      </header>
-
-      <div className={styles.section}>
-        <h4 className={styles.subheading}>Histórico de aprovação</h4>
-        <div className={styles.chartWrap}>
-          <LineChart
-            values={fullHistory}
-            stroke="var(--green-500)"
-            yMin={0}
-            yMax={100}
-            tooltip={(v) =>
-              v !== undefined && v !== null
-                ? `${v.toFixed(1)}% de aprovação`
-                : 'Sem dado'
-            }
-            yFormatter={(v) => `${v.toFixed(0)}%`}
-            currentLabel={`${approval.toFixed(1)}%`}
-          />
-        </div>
-      </div>
-
-      <div className={styles.section}>
-        <h4 className={styles.subheading}>Tabela de histórico</h4>
-        <table className={styles.historyTable}>
-          <thead>
-            <tr>
-              <th>Mês</th>
-              <th>Aprovação</th>
-              <th>Variação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fullHistory.map((val, i) => {
-              const p = i > 0 ? fullHistory[i - 1] : null;
-              const d = p !== null ? val - p : null;
-              return (
-                <tr key={i}>
-                  <td className={styles.tableMonth}>Mês {i + 1}</td>
-                  <td className={styles.tableValue}>{val.toFixed(1)}%</td>
-                  <td>
-                    {d !== null ? (
-                      <span
-                        className={styles.tableDelta}
-                        data-direction={
-                          d > 0.05 ? 'good' : d < -0.05 ? 'bad' : 'neutral'
-                        }
-                      >
-                        {d > 0 ? '+' : ''}
-                        {d.toFixed(1)} p.p.
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
   );
 }

@@ -159,6 +159,7 @@ function queryActivePolicies(state: QueryState): QueryResult {
     activeMonths: p.activeMonths,
     fiscalAnnual: p.fiscalAnnual,
     effects: p.effects,
+    newIndicators: p.newIndicators ?? [],
   }));
 
   return ok('active_policies', { count: rows.length, policies: rows });

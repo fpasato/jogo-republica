@@ -4,6 +4,7 @@ import { db, type SaveGame } from '../../game/services/persistence/db';
 import { deleteMembersForSave } from '../../game/services/parliament/memberService';
 import type { PlayerProfile } from '../../game/services/politics/profileService';
 import { NewGameForm } from './NewGameForm';
+import { VolumeControl } from '../../components/BackgroundAudio';
 import styles from './styles.module.css';
 
 type SaveWithDiff = SaveGame & {
@@ -76,6 +77,7 @@ export function Menu({ onStartGame }: { onStartGame?: () => void }) {
         <div className={styles.page}>
             <header className={styles.pageHeader}>
                 <h1 className={styles.pageTitle}>Menu Principal</h1>
+                <VolumeControl />
             </header>
 
             {creating ? (
@@ -123,7 +125,7 @@ export function Menu({ onStartGame }: { onStartGame?: () => void }) {
                                     </header>
 
                                     <p className={styles.saveMeta}>
-                                        Último acesso:{' '}
+                                        Partido: {save.game?.profile?.partyAcronym || 'N/A'} · Último acesso:{' '}
                                         {new Date(save.updatedAt).toLocaleString('pt-BR')}
                                     </p>
 

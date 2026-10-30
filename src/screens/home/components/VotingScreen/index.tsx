@@ -174,7 +174,7 @@ export function VotingScreen({ outcome, policyName, onFinish, error, onCancel }:
                             </ul>
                         </div>
                         <button type="button" className={styles.continue} onClick={() => { void onFinish(outcome); }}>
-                            {outcome.approved ? 'Aplicar medida e avançar mês' : 'Voltar à criação de medida'}
+                            {outcome.approved ? 'Aplicar medida e avançar mês' : 'Avançar mês'}
                         </button>
                     </section>
                 )}

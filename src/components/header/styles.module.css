@@ -33,7 +33,6 @@
   justify-content: space-between;
   gap: 24px;
   padding: 14px 32px;
-  max-width: 1440px;
   margin: 0 auto;
   min-height: 68px;
 }
@@ -141,7 +140,6 @@
   align-items: stretch;
   gap: 0;
   padding: 0 32px;
-  max-width: 1440px;
   margin: 0 auto;
   background: var(--bg-surface);
   border-top: 1px solid var(--border);

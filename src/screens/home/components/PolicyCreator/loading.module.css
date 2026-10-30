@@ -1,0 +1,226 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.94);
+  animation: overlayIn 200ms ease-out;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.panel {
+  --bg-surface: #0a0a0a;
+  --border: #262626;
+  --border-strong: #3a3a3a;
+  --text: #f5f5f5;
+  --text-muted: #8a8a8a;
+  --green-500: #22c55e;
+  --yellow-500: #facc15;
+  --blue-500: #3b82f6;
+
+  position: relative;
+  width: min(420px, 100%);
+  padding: 44px 36px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    0 32px 96px rgba(0, 0, 0, 0.95),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: panelIn 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--green-500),
+    var(--yellow-500),
+    var(--blue-500)
+  );
+  pointer-events: none;
+}
+
+/* ── Tri-color pulse ── */
+
+.mark {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.mark > span {
+  display: block;
+  width: 8px;
+  height: 14px;
+  background: var(--green-500);
+  transform-origin: center;
+  animation: markPulse 1.2s ease-in-out infinite;
+}
+
+.mark > span:nth-child(2) {
+  background: var(--yellow-500);
+  animation-delay: 0.15s;
+}
+
+.mark > span:nth-child(3) {
+  background: var(--blue-500);
+  animation-delay: 0.3s;
+}
+
+@keyframes markPulse {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scaleY(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* ── Título + frase ── */
+
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text);
+  text-align: center;
+  line-height: 1.4;
+}
+
+.phraseWrap {
+  min-height: 48px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.phrase {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.55;
+  animation: phraseIn 400ms ease-out;
+  overflow-wrap: anywhere;
+}
+
+@keyframes phraseIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Barra de progresso indeterminada ── */
+
+.progress {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progressBar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--green-500) 20%,
+    var(--yellow-500) 50%,
+    var(--blue-500) 80%,
+    transparent 100%
+  );
+  animation: progressSlide 1.6s ease-in-out infinite;
+}
+
+@keyframes progressSlide {
+  0%   { left: -40%; }
+  100% { left: 100%; }
+}
+
+/* ── Responsivo ── */
+
+@media (max-width: 480px) {
+  .overlay {
+    padding: 16px;
+  }
+
+  .panel {
+    padding: 32px 24px 28px;
+    gap: 20px;
+  }
+
+  .title {
+    font-size: 12px;
+  }
+
+  .phrase {
+    font-size: 13px;
+  }
+}
+
+/* ── Acessibilidade ── */
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .panel,
+  .mark > span,
+  .phrase,
+  .progressBar {
+    animation: none;
+  }
+
+  .mark > span {
+    opacity: 0.7;
+    transform: none;
+  }
+
+  .progressBar {
+    left: 30%;
+    width: 40%;
+  }
+}

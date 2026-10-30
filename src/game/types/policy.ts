@@ -1,4 +1,4 @@
-import type { AIInterpretation } from './ai';
+import type { AIInterpretation, MeasureKind, NewPolicyIndicator } from './ai';
 import type { InstrumentId } from '../data/catalog';
 
 export type PolicyType = InstrumentId;
@@ -14,6 +14,7 @@ export type PolicyStatus = 'active' | 'approved' | 'rejected' | 'archived';
 export interface ActivePolicy {
   id: string;
   name: string;
+  measureKind?: MeasureKind;
   type: PolicyType;
   effects: PolicyEffects;
   groupReactions: Record<string, number>;
@@ -23,6 +24,7 @@ export interface ActivePolicy {
   durationMonths: number;
   activeMonths: number;
   fiscalAnnual: number;
+  newIndicators?: NewPolicyIndicator[];
 }
 
 export interface PolicyHistoryEntry {

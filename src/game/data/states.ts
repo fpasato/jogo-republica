@@ -79,6 +79,18 @@ export const STATES: Record<StateId, StateStructural> = {
 };
 
 export const STATE_IDS = Object.keys(STATES) as StateId[];
+
+export function stateApprovalShift(state: StateStructural, govIdeology: number): number {
+  const regionalLean = state.region === 'Sul' ? 0.7
+    : state.region === 'Sudeste' ? 0.25
+      : state.region === 'Centro-Oeste' ? 0.75
+        : state.region === 'Nordeste' ? -0.65
+          : state.region === 'Norte' ? -0.25 : 0;
+  const localLean = state.politicalInclination * 0.4 + regionalLean * 0.6;
+  // Governos de direita ganham uma vantagem regional mais clara no Sul e
+  // Sudeste; a fórmula também funciona de forma espelhada para a esquerda.
+  return localLean * 8 + (govIdeology / 3) * localLean * 7;
+}
 export const REGIONS: Region[] = ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul'];
 
 export function statesByRegion(region: Region): StateStructural[] {

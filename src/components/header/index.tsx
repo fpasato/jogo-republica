@@ -1,6 +1,7 @@
 import styles from './styles.module.css';
 import { useGameStore } from '../../store/gameStore';
 import logo from '../../assets/logo.png';
+import { VolumeControl } from '../BackgroundAudio';
 
 interface HeaderProps {
     onBackToMenu?: () => void;
@@ -36,6 +37,7 @@ export function Header({ onBackToMenu }: HeaderProps) {
                     </div>
                     <div className={styles.monthInfo}>
                         <p className={styles.month}>{monthLabel}</p>
+                        <VolumeControl />
                         <button
                             type="button"
                             className={styles.exitButton}
@@ -68,6 +70,13 @@ export function Header({ onBackToMenu }: HeaderProps) {
                     onClick={() => setScreen('pais')}
                 >
                     País
+                </button>
+                <button
+                    type="button"
+                    className={`${styles.navLink} ${currentScreen === 'medidas' ? styles.active : ''}`}
+                    onClick={() => setScreen('medidas')}
+                >
+                    Medidas
                 </button>
             </nav>
         </header>
